@@ -6,8 +6,8 @@
 *.dSYM
 
 # Compiled executable files
-.exe
-.out
+*.exe
+*.out
 
 # CMake build directory
 build/
