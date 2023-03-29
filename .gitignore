@@ -1,0 +1,19 @@
+# Compiled object files
+*.o
+*.obj
+
+# Complied debug files
+*.dSYM
+
+# Compiled executable files
+.exe
+.out
+
+# CMake build directory
+build/
+
+# Visual Studio Code workspace directory
+.vscode/
+
+#Mac OS system files
+.DS_Store
