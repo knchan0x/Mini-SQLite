@@ -2,6 +2,8 @@
 #include <string>
 #include <array>
 
+#include "table.h"
+
 struct InputBuffer
 {
     std::string buffer;
@@ -32,50 +34,18 @@ enum class StatementType
     SELECT
 };
 
-const uint32_t COLUMN_USERNAME_SIZE = 32;
-const uint32_t COLUMN_EMAIL_SIZE = 255;
-struct Row
-{
-    uint32_t id;
-    char username[COLUMN_USERNAME_SIZE]; // cannot use std::array due to sscanf
-    char email[COLUMN_EMAIL_SIZE];       // cannot use std::array due to sscanf
-    /* 1 padding byte for email size 255 */
-};
-
-Row *new_row()
-{
-    return new Row;
-}
-
-const uint32_t ID_SIZE = sizeof(Row::id);
-const uint32_t USERNAME_SIZE = sizeof(Row::username);
-const uint32_t EMAIL_SIZE = sizeof(Row::email);
-
-const uint32_t ID_OFFSET = 0;
-const uint32_t USERNAME_OFFSET = ID_OFFSET + ID_SIZE;
-const uint32_t EMAIL_OFFSET = USERNAME_OFFSET + USERNAME_SIZE;
-const uint32_t ROW_SIZE = ID_SIZE + USERNAME_SIZE + EMAIL_SIZE;
-
 struct Statement
 {
     StatementType type;
     Row row_to_insert;
+
+    Statement()
+    {
+        this->row_to_insert.id = 0;
+        std::fill(this->row_to_insert.username, this->row_to_insert.username + USERNAME_SIZE, 0);
+        std::fill(this->row_to_insert.email, this->row_to_insert.email + EMAIL_SIZE, 0);
+    }
 };
-
-Statement *new_statement()
-{
-    Statement *statement = new Statement;
-    statement->row_to_insert.id = 0;
-    std::fill(statement->row_to_insert.username, statement->row_to_insert.username + USERNAME_SIZE, 0);
-    std::fill(statement->row_to_insert.email, statement->row_to_insert.email + EMAIL_SIZE, 0);
-    return statement;
-}
-
-InputBuffer *new_input_buffer()
-{
-    InputBuffer *input_buffer = new InputBuffer;
-    return input_buffer;
-}
 
 void close_input_buffer(InputBuffer *input_buffer)
 {
@@ -120,45 +90,6 @@ PrepareResult prepare_statement(InputBuffer *input_buffer, Statement *statement)
     return PrepareResult::UNRECOGNIZED_STATEMENT;
 }
 
-const uint32_t TABLE_MAX_PAGES = 100;
-const uint32_t PAGE_SIZE = 4096;
-const uint32_t ROWS_PER_PAGE = PAGE_SIZE / ROW_SIZE;
-const uint32_t TABLE_MAX_ROWS = ROWS_PER_PAGE * TABLE_MAX_PAGES;
-
-struct Page
-{
-    std::array<Row, ROWS_PER_PAGE> rows; // no overhead
-};
-
-void serialize_row(Row *source, Page *destination, uint32_t row_num)
-{
-    destination->rows[row_num] = *source;
-};
-
-void deserialize_row(Page *source, Row *destination, uint32_t row_num)
-{
-    *destination = source->rows[row_num];
-};
-
-struct Table
-{
-    uint32_t num_rows;
-    std::array<Page *, TABLE_MAX_PAGES> pages;
-};
-
-Page *row_slot(Table *table, uint32_t row_num)
-{
-    uint32_t page_num = row_num / ROWS_PER_PAGE;
-    Page *page = table->pages[page_num];
-    if (page == nullptr)
-    {
-        // Allocate memory only when we try to access page
-        table->pages[page_num] = new Page;
-        page = table->pages[page_num];
-    }
-    return page;
-}
-
 void print_prompt()
 {
     std::cout << "db > ";
@@ -190,23 +121,13 @@ ExecuteResult execute_insert(Statement *statement, Table *table)
     return ExecuteResult::EXECUTE_SUCCESS;
 }
 
-void print_row(Row *row)
-{
-    std::cout << row->id
-              << " "
-              << std::string(std::begin(row->username), std::end(row->username))
-              << " "
-              << std::string(std::begin(row->email), std::end(row->email))
-              << std::endl;
-}
-
 ExecuteResult execute_select(Statement *statement, Table *table)
 {
     Row row;
     for (uint32_t i = 0; i < table->num_rows; i++)
     {
         deserialize_row(row_slot(table, i), &row, i % ROWS_PER_PAGE);
-        print_row(&row);
+        row.print();
     }
     return ExecuteResult::EXECUTE_SUCCESS;
 }
@@ -222,33 +143,10 @@ ExecuteResult execute_statement(Statement *statement, Table *table)
     }
 }
 
-Table *new_table()
-{
-    Table *table = new Table;
-    table->num_rows = 0;
-    for (uint32_t i = 0; i < TABLE_MAX_PAGES; i++)
-    {
-        table->pages[i] = nullptr;
-    }
-    return table;
-}
-
-void delete_table(Table *table)
-{
-    for (auto page : table->pages)
-    {
-        if (page)
-        {
-            delete[] page;
-        }
-    }
-    delete table;
-}
-
 int main(int argc, char *argv[])
 {
-    Table *table = new_table();
-    InputBuffer *input_buffer = new_input_buffer();
+    Table *table = new Table;
+    InputBuffer *input_buffer = new InputBuffer;
     while (true)
     {
         print_prompt();
@@ -266,7 +164,7 @@ int main(int argc, char *argv[])
             }
         }
 
-        Statement *statement = new_statement();
+        Statement *statement = new Statement;
         switch (prepare_statement(input_buffer, statement))
         {
         case PrepareResult::SUCCESS:
@@ -289,4 +187,6 @@ int main(int argc, char *argv[])
             break;
         }
     }
+
+    delete table; // TODO
 }
