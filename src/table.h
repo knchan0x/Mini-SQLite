@@ -9,10 +9,9 @@ const uint32_t COLUMN_EMAIL_SIZE = 255;
 struct Row
 {
     uint32_t id;
-    char username[COLUMN_USERNAME_SIZE]; // cannot use std::array due to sscanf
-    char email[COLUMN_EMAIL_SIZE];       // cannot use std::array due to sscanf
-    /* 1 padding byte for email size 255 */
-
+    char username[COLUMN_USERNAME_SIZE + 1]; // cannot use std::array due to sscanf
+    /* 1 padding byte for email size 33 */
+    char email[COLUMN_EMAIL_SIZE + 1]; // cannot use std::array due to sscanf
     void print();
 };
 
@@ -43,7 +42,8 @@ struct Table
     uint32_t num_rows;
     std::array<Page *, TABLE_MAX_PAGES> pages;
 
-    Table() {
+    Table()
+    {
         this->num_rows = 0;
         for (uint32_t i = 0; i < TABLE_MAX_PAGES; i++)
         {
@@ -51,7 +51,8 @@ struct Table
         }
     }
 
-    ~Table() {
+    ~Table()
+    {
         for (auto page : this->pages)
         {
             if (page)

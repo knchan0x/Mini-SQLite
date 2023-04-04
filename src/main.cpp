@@ -1,6 +1,8 @@
 #include <iostream>
 #include <string>
 #include <array>
+#include <sstream>
+#include <cstring>
 
 #include "table.h"
 
@@ -24,7 +26,9 @@ enum class MetaCommandResult
 enum class PrepareResult
 {
     SUCCESS,
+    PREPARE_NEGATIVE_ID,
     PREPARE_SYNTAX_ERROR,
+    PREPARE_STRING_TOO_LONG,
     UNRECOGNIZED_STATEMENT
 };
 
@@ -42,8 +46,6 @@ struct Statement
     Statement()
     {
         this->row_to_insert.id = 0;
-        std::fill(this->row_to_insert.username, this->row_to_insert.username + USERNAME_SIZE, 0);
-        std::fill(this->row_to_insert.email, this->row_to_insert.email + EMAIL_SIZE, 0);
     }
 };
 
@@ -65,22 +67,51 @@ MetaCommandResult do_meta_command(InputBuffer *input_buffer)
     }
 }
 
+PrepareResult prepare_insert(InputBuffer *input_buffer, Statement *statement)
+{
+    statement->type = StatementType::INSERT;
+
+    std::vector<std::string> keywords;
+    std::stringstream inputs(input_buffer->buffer);
+    std::string keyword;
+    while (std::getline(inputs, keyword, ' '))
+    {
+        keywords.push_back(keyword);
+    }
+
+    if (keywords.size() > 4) {
+        return PrepareResult::PREPARE_SYNTAX_ERROR;
+    }
+
+    auto id_string = keywords[1];
+    auto username = keywords[2];
+    auto email = keywords[3];
+
+    int id = atoi(id_string.c_str());
+    if (id < 0) {
+        return PrepareResult::PREPARE_NEGATIVE_ID;
+    }
+    if (username.size() > COLUMN_USERNAME_SIZE)
+    {
+        return PrepareResult::PREPARE_STRING_TOO_LONG;
+    }
+    if (email.size() > COLUMN_EMAIL_SIZE)
+    {
+        return PrepareResult::PREPARE_STRING_TOO_LONG;
+    }
+
+    statement->row_to_insert.id = id;
+    std::strcpy(statement->row_to_insert.username, username.c_str());
+    std::strcpy(statement->row_to_insert.email, email.c_str());
+
+    return PrepareResult::SUCCESS;
+}
+
 PrepareResult prepare_statement(InputBuffer *input_buffer, Statement *statement)
 {
     if (input_buffer->buffer.find("insert") == 0)
     {
-        statement->type = StatementType::INSERT;
-
-        int args_assigned = std::sscanf(
-            input_buffer->buffer.c_str(), "insert %d %s %s", &(statement->row_to_insert.id),
-            statement->row_to_insert.username, statement->row_to_insert.email);
-
-        if (args_assigned < 3)
-        {
-            return PrepareResult::PREPARE_SYNTAX_ERROR;
-        }
-
-        return PrepareResult::SUCCESS;
+        return prepare_insert(input_buffer, statement);
     }
     if (input_buffer->buffer.find("select") == 0)
     {
@@ -169,6 +200,12 @@ int main(int argc, char *argv[])
         {
         case PrepareResult::SUCCESS:
             break;
+        case PrepareResult::PREPARE_NEGATIVE_ID:
+            std::cout << "ID must be positive." << std::endl;
+            continue;
+        case PrepareResult::PREPARE_STRING_TOO_LONG:
+            std::cout << "String is too long." << std::endl;
+            continue;
         case (PrepareResult::PREPARE_SYNTAX_ERROR):
             std::cout << "Syntax error. Could not parse statement." << std::endl;
             continue;
