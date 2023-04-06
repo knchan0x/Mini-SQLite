@@ -2,7 +2,6 @@
 #include <string>
 #include <array>
 #include <sstream>
-#include <cstring>
 
 #include "table.h"
 
@@ -11,19 +10,19 @@ struct InputBuffer
     std::string buffer;
 };
 
-enum class ExecuteResult
+enum ExecuteResult
 {
     EXECUTE_SUCCESS,
     EXECUTE_TABLE_FULL
 };
 
-enum class MetaCommandResult
+enum MetaCommandResult
 {
     SUCCESS,
     UNRECOGNIZED_COMMAND
 };
 
-enum class PrepareResult
+enum PrepareResult
 {
     SUCCESS,
     PREPARE_NEGATIVE_ID,
@@ -32,7 +31,7 @@ enum class PrepareResult
     UNRECOGNIZED_STATEMENT
 };
 
-enum class StatementType
+enum StatementType
 {
     INSERT,
     SELECT
@@ -49,16 +48,12 @@ struct Statement
     }
 };
 
-void close_input_buffer(InputBuffer *input_buffer)
-{
-    delete input_buffer;
-}
-
-MetaCommandResult do_meta_command(InputBuffer *input_buffer)
+MetaCommandResult do_meta_command(InputBuffer *input_buffer, Table* table)
 {
     if (input_buffer->buffer.find(".exit") == 0)
     {
-        close_input_buffer(input_buffer);
+        delete input_buffer;
+        delete table;
         std::exit(EXIT_SUCCESS);
     }
     else
@@ -67,25 +62,32 @@ MetaCommandResult do_meta_command(InputBuffer *input_buffer)
     }
 }
 
+enum InsertPosition {
+    COMMAND,
+    ID,
+    USERNAME,
+    EMAIL
+};
+
 PrepareResult prepare_insert(InputBuffer *input_buffer, Statement *statement)
 {
     statement->type = StatementType::INSERT;
 
-    std::vector<std::string> keywords;
+    std::vector<std::string> tokens;
     std::stringstream inputs(input_buffer->buffer);
-    std::string keyword;
-    while (std::getline(inputs, keyword, ' '))
+    std::string token;
+    while (std::getline(inputs, token, ' '))
     {
-        keywords.push_back(keyword);
+        tokens.push_back(token);
     }
 
-    if (keywords.size() > 4) {
+    if (tokens.size() > 4) {
         return PrepareResult::PREPARE_SYNTAX_ERROR;
     }
 
-    auto id_string = keywords[1];
-    auto username = keywords[2];
-    auto email = keywords[3];
+    auto id_string = tokens[InsertPosition::ID];
+    auto username = tokens[InsertPosition::USERNAME];
+    auto email = tokens[InsertPosition::EMAIL];
 
     int id = atoi(id_string.c_str());
     if (id < 0) {
@@ -176,7 +178,11 @@ ExecuteResult execute_statement(Statement *statement, Table *table)
 
 int main(int argc, char *argv[])
 {
-    Table *table = new Table;
+    if (argc < 2) {
+        std::cout << "Must supply a database filename." << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
+    Table *table = new Table(argv[1]);
     InputBuffer *input_buffer = new InputBuffer;
     while (true)
     {
@@ -184,7 +190,7 @@ int main(int argc, char *argv[])
         read_input(input_buffer);
         if (input_buffer->buffer.find(".") == 0)
         {
-            switch (do_meta_command(input_buffer))
+            switch (do_meta_command(input_buffer, table))
             {
             case MetaCommandResult::SUCCESS:
                 /* code */
@@ -224,6 +230,4 @@ int main(int argc, char *argv[])
             break;
         }
     }
-
-    delete table; // TODO
 }
