@@ -60,4 +60,15 @@ struct Table
     ~Table();
 };
 
-Page *row_slot(Table *table, uint32_t row_num);
+struct Cursor
+{
+    Table *table;
+    uint32_t row_num;
+    bool end_of_table; // Indicates is the cursor locate in a position after the last element
+};
+
+Cursor *table_start(Table *table);
+Cursor *table_end(Table *table);
+
+Page *cursor_value(Cursor *cursor);
+void cursor_advance(Cursor *cursor);

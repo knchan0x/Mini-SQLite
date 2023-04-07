@@ -2,6 +2,7 @@
 #include <string>
 #include <array>
 #include <sstream>
+#include <vector>
 
 #include "table.h"
 
@@ -10,19 +11,19 @@ struct InputBuffer
     std::string buffer;
 };
 
-enum ExecuteResult
+enum class ExecuteResult
 {
     EXECUTE_SUCCESS,
     EXECUTE_TABLE_FULL
 };
 
-enum MetaCommandResult
+enum class MetaCommandResult
 {
     SUCCESS,
     UNRECOGNIZED_COMMAND
 };
 
-enum PrepareResult
+enum class PrepareResult
 {
     SUCCESS,
     PREPARE_NEGATIVE_ID,
@@ -31,7 +32,7 @@ enum PrepareResult
     UNRECOGNIZED_STATEMENT
 };
 
-enum StatementType
+enum class StatementType
 {
     INSERT,
     SELECT
@@ -48,7 +49,7 @@ struct Statement
     }
 };
 
-MetaCommandResult do_meta_command(InputBuffer *input_buffer, Table* table)
+MetaCommandResult do_meta_command(InputBuffer *input_buffer, Table *table)
 {
     if (input_buffer->buffer.find(".exit") == 0)
     {
@@ -62,12 +63,9 @@ MetaCommandResult do_meta_command(InputBuffer *input_buffer, Table* table)
     }
 }
 
-enum InsertPosition {
-    COMMAND,
-    ID,
-    USERNAME,
-    EMAIL
-};
+#define INSERT_POSITION_ID = 1
+#define INSERT_POSITION_USERNAME = 2
+#define INSERT_POSITION_EMAIL = 3
 
 PrepareResult prepare_insert(InputBuffer *input_buffer, Statement *statement)
 {
@@ -81,16 +79,18 @@ PrepareResult prepare_insert(InputBuffer *input_buffer, Statement *statement)
         tokens.push_back(token);
     }
 
-    if (tokens.size() > 4) {
+    if (tokens.size() > 4)
+    {
         return PrepareResult::PREPARE_SYNTAX_ERROR;
     }
 
-    auto id_string = tokens[InsertPosition::ID];
-    auto username = tokens[InsertPosition::USERNAME];
-    auto email = tokens[InsertPosition::EMAIL];
+    std::string id_string = tokens[1];
+    std::string username = tokens[2];
+    std::string email = tokens[3];
 
     int id = atoi(id_string.c_str());
-    if (id < 0) {
+    if (id < 0)
+    {
         return PrepareResult::PREPARE_NEGATIVE_ID;
     }
     if (username.size() > COLUMN_USERNAME_SIZE)
@@ -147,21 +147,29 @@ ExecuteResult execute_insert(Statement *statement, Table *table)
     }
 
     Row *row_to_insert = &(statement->row_to_insert);
+    Cursor *cursor = table_end(table);
 
-    serialize_row(row_to_insert, row_slot(table, table->num_rows), table->num_rows % ROWS_PER_PAGE);
+    serialize_row(row_to_insert, cursor_value(cursor), table->num_rows % ROWS_PER_PAGE);
     table->num_rows += 1;
+
+    delete cursor;
 
     return ExecuteResult::EXECUTE_SUCCESS;
 }
 
 ExecuteResult execute_select(Statement *statement, Table *table)
 {
+    Cursor *cursor = table_start(table);
     Row row;
-    for (uint32_t i = 0; i < table->num_rows; i++)
+    uint32_t i = 0;
+    while (!cursor->end_of_table)
     {
-        deserialize_row(row_slot(table, i), &row, i % ROWS_PER_PAGE);
+        deserialize_row(cursor_value(cursor), &row, i % ROWS_PER_PAGE);
         row.print();
-    }
+        cursor_advance(cursor);
+        i++;
+    };
+    delete cursor;
     return ExecuteResult::EXECUTE_SUCCESS;
 }
 
@@ -178,7 +186,8 @@ ExecuteResult execute_statement(Statement *statement, Table *table)
 
 int main(int argc, char *argv[])
 {
-    if (argc < 2) {
+    if (argc < 2)
+    {
         std::cout << "Must supply a database filename." << std::endl;
         std::exit(EXIT_FAILURE);
     }
