@@ -49,6 +49,16 @@ struct Statement
     }
 };
 
+void print_constants()
+{
+    std::cout << "ROW_SIZE: " << ROW_SIZE << std::endl;
+    std::cout << "COMMON_NODE_HEADER_SIZE: " << COMMON_NODE_HEADER_SIZE << std::endl;
+    std::cout << "LEAF_NODE_HEADER_SIZE: " << LEAF_NODE_HEADER_SIZE << std::endl;
+    std::cout << "LEAF_NODE_CELL_SIZE: " << LEAF_NODE_CELL_SIZE << std::endl;
+    std::cout << "LEAF_NODE_SPACE_FOR_CELLS: " << LEAF_NODE_SPACE_FOR_CELLS << std::endl;
+    std::cout << "LEAF_NODE_MAX_CELLS: " << LEAF_NODE_MAX_CELLS << std::endl;
+}
+
 MetaCommandResult do_meta_command(InputBuffer *input_buffer, Table *table)
 {
     if (input_buffer->buffer.find(".exit") == 0)
@@ -56,6 +66,18 @@ MetaCommandResult do_meta_command(InputBuffer *input_buffer, Table *table)
         delete input_buffer;
         delete table;
         std::exit(EXIT_SUCCESS);
+    }
+    else if (input_buffer->buffer.find(".btree") == 0)
+    {
+        std::cout << "Tree:" << std::endl;
+        table->pager->get_page(0)->print();
+        return MetaCommandResult::SUCCESS;
+    }
+    else if (input_buffer->buffer.find(".constant") == 0)
+    {
+        std::cout << "Constants:" << std::endl;
+        print_constants();
+        return MetaCommandResult::SUCCESS;
     }
     else
     {
@@ -141,35 +163,26 @@ void read_input(InputBuffer *input_buffer)
 
 ExecuteResult execute_insert(Statement *statement, Table *table)
 {
-    if (table->num_rows >= TABLE_MAX_ROWS)
+    if ((table->pager->get_page(table->get_root_page_num())->get_num_cells() >= LEAF_NODE_MAX_CELLS))
     {
         return ExecuteResult::EXECUTE_TABLE_FULL;
     }
 
+    auto cursor = std::make_unique<Cursor>(Cursor(table, CursorPosition::END));
     Row *row_to_insert = &(statement->row_to_insert);
-    Cursor *cursor = table_end(table);
-
-    serialize_row(row_to_insert, cursor_value(cursor), table->num_rows % ROWS_PER_PAGE);
-    table->num_rows += 1;
-
-    delete cursor;
+    cursor->insert(row_to_insert->id, row_to_insert);
 
     return ExecuteResult::EXECUTE_SUCCESS;
 }
 
 ExecuteResult execute_select(Statement *statement, Table *table)
 {
-    Cursor *cursor = table_start(table);
-    Row row;
-    uint32_t i = 0;
+    auto cursor = std::make_unique<Cursor>(Cursor(table, CursorPosition::BEGIN));
     while (!cursor->end_of_table)
     {
-        deserialize_row(cursor_value(cursor), &row, i % ROWS_PER_PAGE);
-        row.print();
-        cursor_advance(cursor);
-        i++;
+        cursor->table->pager->get_page(cursor->page_num)->get_cell(cursor->cell_num)->get_value()->print();
+        cursor->advance();
     };
-    delete cursor;
     return ExecuteResult::EXECUTE_SUCCESS;
 }
 
@@ -202,7 +215,6 @@ int main(int argc, char *argv[])
             switch (do_meta_command(input_buffer, table))
             {
             case MetaCommandResult::SUCCESS:
-                /* code */
                 continue;
             case MetaCommandResult::UNRECOGNIZED_COMMAND:
                 std::cout << "Unrecognized command " << input_buffer->buffer << std::endl;

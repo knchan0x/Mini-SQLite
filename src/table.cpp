@@ -13,6 +13,72 @@ void Row::print()
               << std::endl;
 }
 
+Cell::Cell(uint32_t *key, Row *value)
+    : key(key), value(value)
+{
+}
+
+uint32_t Cell::get_key()
+{
+    return *this->key;
+}
+
+void Cell::set_key(uint32_t key)
+{
+    *this->key = key;
+}
+
+Row *Cell::get_value()
+{
+    return this->value;
+}
+
+void Cell::set_value(Row *row)
+{
+    *this->value = *row; // copy to // TODO: ok? or need to use memcpy?
+}
+
+Node::Node(NodeType *nodeType, bool *isRoot, Node *parent)
+    : nodeType(nodeType), isRoot(isRoot), parent(parent)
+{
+}
+
+LeafNode::LeafNode(NodeType *nodeType, bool *isRoot, Node *parent, uint32_t *num_cells)
+    : Node(nodeType, isRoot, parent), num_cells(num_cells)
+{
+}
+
+uint32_t LeafNode::get_num_cells()
+{
+    return *num_cells;
+}
+
+void LeafNode::set_num_cells(uint32_t num_cells)
+{
+    *this->num_cells = num_cells;
+}
+
+Cell *LeafNode::get_cell(uint32_t cell_num)
+{
+    return this->cells[cell_num];
+}
+
+void LeafNode::set_cell(uint32_t cell_num, Cell *cell)
+{
+    this->cells[cell_num] = cell;
+}
+
+void LeafNode::print()
+{
+    uint32_t num_cells = *this->num_cells;
+    std::cout << "leaf (size " << num_cells << ")" << std::endl;
+    for (uint32_t i = 0; i < num_cells; i++)
+    {
+        uint32_t key = this->cells[i]->get_key();
+        std::cout << "  - " << i << " : " << key << std::endl;
+    }
+}
+
 Pager::Pager(std::string filename)
 {
     this->filename = filename;
@@ -29,11 +95,16 @@ Pager::Pager(std::string filename)
             std::exit(EXIT_FAILURE);
         }
     }
-    else
+
+    this->file_length = file.tellg();
+    file.close();
+
+    this->num_pages = file_length / PAGE_SIZE;
+    if (file_length % PAGE_SIZE != 0)
     {
-        this->file_length = file.tellg();
-        file.close();
-    };
+        std::cout << "File Corrupted. Db file contains partial page." << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
 
     for (uint32_t i = 0; i < TABLE_MAX_PAGES; i++)
     {
@@ -50,11 +121,18 @@ Pager::~Pager()
             delete page;
         }
     }
+    for (auto data : this->page_data)
+    {
+        if (data)
+        {
+            delete data;
+        }
+    }
 }
 
-void Pager::flush(uint32_t page_num, uint32_t size)
+void Pager::flush(uint32_t page_num)
 {
-    if (this->pages[page_num] == NULL)
+    if (this->pages[page_num] == nullptr)
     {
         std::cout << "Tried to flush null page." << std::endl;
         std::exit(EXIT_FAILURE);
@@ -68,7 +146,7 @@ void Pager::flush(uint32_t page_num, uint32_t size)
     };
 
     file.seekp(page_num * PAGE_SIZE, std::ios::beg);
-    file.write(this->serialize(this->pages[page_num], size), size);
+    file.write(this->page_data[page_num], PAGE_SIZE);
 
     if (file.bad())
     {
@@ -84,7 +162,7 @@ void Pager::flush(uint32_t page_num, uint32_t size)
     file.close();
 }
 
-Page *Pager::get_page(uint32_t page_num)
+LeafNode *Pager::get_page(uint32_t page_num)
 {
     if (page_num > TABLE_MAX_PAGES)
     {
@@ -97,17 +175,9 @@ Page *Pager::get_page(uint32_t page_num)
     if (this->pages[page_num] == nullptr)
     {
         // Cache miss. Allocate memory and load from file.
-        uint32_t num_pages = this->file_length / PAGE_SIZE;
+        uint32_t num_pages = this->num_pages;
 
-        // We might save a partial page at the end of the file
-        uint32_t read_size = PAGE_SIZE;
-        if (this->file_length % PAGE_SIZE)
-        {
-            num_pages += 1;
-            read_size = this->file_length % PAGE_SIZE;
-        }
-
-        char *page_data = new char[PAGE_SIZE];
+        char *data = new char[PAGE_SIZE];
         if (page_num <= num_pages)
         {
             std::ifstream file = std::ifstream(filename, std::ios::ate | std::ios::binary);
@@ -117,8 +187,8 @@ Page *Pager::get_page(uint32_t page_num)
                 std::exit(EXIT_FAILURE);
             };
             file.seekg(page_num * PAGE_SIZE, std::ios::beg);
-            file.read(page_data, read_size);
-            if (sizeof(page_data) == 0)
+            file.read(data, PAGE_SIZE);
+            if (sizeof(data) == 0)
             {
                 std::cout << "Error reading file: " << this->filename << std::endl;
                 std::exit(EXIT_FAILURE);
@@ -126,114 +196,141 @@ Page *Pager::get_page(uint32_t page_num)
             file.close();
         }
 
-        this->pages[page_num] = this->deserialize(page_data, read_size);
+        this->page_data[page_num] = data;
+
+        if (page_num >= this->num_pages)
+        {
+            this->num_pages = page_num + 1;
+        }
     }
+
+    this->pages[page_num] = this->deserialize(this->page_data[page_num]);
 
     return this->pages[page_num];
 }
 
-char *Pager::serialize(Page *page, uint32_t size)
+LeafNode *Pager::deserialize(char *page_data)
 {
-    char *page_data = new char[size];
-    char *pos = page_data;
+    LeafNode *node = new LeafNode(
+        (NodeType *)(&page_data[NODE_TYPE_OFFSET]),
+        (bool *)(&page_data[IS_ROOT_OFFSET]),
+        (Node *)(&page_data[PARENT_POINTER_OFFSET]),
+        (uint32_t *)(&page_data[LEAF_NODE_NUM_CELLS_OFFSET]));
 
-    for (uint32_t i = 0; i < size / ROW_SIZE; i++)
+    uint32_t body_start = LEAF_NODE_HEADER_SIZE;
+    for (uint32_t i = 0; i < LEAF_NODE_MAX_CELLS; i++)
     {
-        memcpy(pos + ID_OFFSET, &(page->rows[i].id), ID_SIZE);
-        memcpy(pos + USERNAME_OFFSET, &(page->rows[i].username), USERNAME_SIZE);
-        memcpy(pos + EMAIL_OFFSET, &(page->rows[i].email), EMAIL_SIZE);
-        pos += ROW_SIZE;
+        uint32_t cell_start = body_start + i * LEAF_NODE_CELL_SIZE;
+        Cell *cell = new Cell(
+            (uint32_t *)(&page_data[cell_start + LEAF_NODE_KEY_OFFSET]),
+            (Row *)(&page_data[cell_start + LEAF_NODE_VALUE_OFFSET]));
+        node->set_cell(i, cell);
     }
-    return page_data;
+    return node;
 }
-
-Page *Pager::deserialize(char *page_data, uint32_t size)
-{
-    Page *page = new Page;
-    uint32_t row_nums = size / ROW_SIZE;
-    for (uint32_t i = 0; i < row_nums; i++)
-    {
-        uint32_t pos = i * ROW_SIZE;
-        page->rows[i].id = page_data[pos];
-        memcpy(&(page->rows[i].username), &page_data[pos] + USERNAME_OFFSET, USERNAME_SIZE);
-        memcpy(&(page->rows[i].email), &page_data[pos] + EMAIL_OFFSET, EMAIL_SIZE);
-    }
-    return page;
-}
-
-void serialize_row(Row *source, Page *destination, uint32_t row_num)
-{
-    destination->rows[row_num] = *source;
-};
-
-void deserialize_row(Page *source, Row *destination, uint32_t row_num)
-{
-    *destination = source->rows[row_num];
-};
 
 Table::Table(std::string filename)
 {
-    Pager *pager = new Pager(filename);
+    this->root_page_num = 0;
+    this->pager = new Pager(filename);
 
-    this->num_rows = pager->file_length / ROW_SIZE;
-    this->pager = pager;
+    if (this->pager->num_pages == 0)
+    {
+        // New database file. Initialize page 0 as leaf node.
+        LeafNode *root_node = this->pager->get_page(0);
+    }
 }
 
 Table::~Table()
 {
-    uint32_t num_full_pages = this->num_rows / ROWS_PER_PAGE;
-    for (uint32_t i = 0; i < num_full_pages; i++)
+    for (uint32_t i = 0; i < pager->num_pages; i++)
     {
-        if (pager->pages[i] == NULL)
+        if (pager->get_page(i) == nullptr)
         {
             continue;
         }
-        pager->flush(i, PAGE_SIZE);
+        pager->flush(i);
     }
-
-    // There may be a partial page to write to the end of the file
-    // This should not be needed after we switch to a B-tree
-    uint32_t num_additional_rows = this->num_rows % ROWS_PER_PAGE;
-    if (num_additional_rows > 0)
-    {
-        uint32_t page_num = num_full_pages;
-        if (pager->pages[page_num] != NULL)
-        {
-            pager->flush(page_num, num_additional_rows * ROW_SIZE);
-        }
-    }
-
     delete pager;
 }
 
-Cursor *table_start(Table *table)
+uint32_t Table::get_root_page_num()
 {
-    Cursor *cursor = new Cursor;
-    cursor->table = table;
-    cursor->row_num = 0;
-    cursor->end_of_table = (table->num_rows == 0);
-    return cursor;
+    return this->root_page_num;
 }
 
-Cursor *table_end(Table *table)
+Row *Cursor::value()
 {
-    Cursor *cursor = new Cursor;
-    cursor->table = table;
-    cursor->row_num = table->num_rows;
-    cursor->end_of_table = true;
-    return cursor;
+    LeafNode *node = this->table->pager->get_page(this->page_num);
+    return node->get_cell(this->cell_num)->get_value();
 }
 
-Page *cursor_value(Cursor *cursor)
+void Cursor::advance()
 {
-    return cursor->table->pager->get_page(cursor->row_num / ROWS_PER_PAGE);
-}
-
-void cursor_advance(Cursor *cursor)
-{
-    cursor->row_num += 1;
-    if (cursor->row_num >= cursor->table->num_rows)
+    LeafNode *node = this->table->pager->get_page(this->page_num);
+    this->cell_num += 1;
+    // TODO: Next page
+    if (this->cell_num >= node->get_num_cells())
     {
-        cursor->end_of_table = true;
+        this->end_of_table = true;
     }
+}
+
+void Cursor::insert(uint32_t key, Row *value)
+{
+    LeafNode *node = this->table->pager->get_page(this->page_num);
+
+    uint32_t num_cells = node->get_num_cells();
+    if (num_cells >= LEAF_NODE_MAX_CELLS)
+    {
+        // Node full
+        std::cout << "Need to implement splitting a leaf node." << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
+
+    if (this->cell_num < num_cells)
+    {
+        // Make room for new cell
+        for (uint32_t i = num_cells; i > this->cell_num; i--)
+        {
+            memcpy(node->get_cell(i), node->get_cell(i - 1), LEAF_NODE_CELL_SIZE);
+        }
+    }
+
+    node->set_num_cells(num_cells + 1);
+    Cell *cell = node->get_cell(this->cell_num); // TODO: operator reload []
+    cell->set_key(key);
+    cell->set_value(value);
+}
+
+Cursor::Cursor(Table *table, CursorPosition position)
+    : table(table)
+{
+    this->page_num = table->get_root_page_num();
+    this->move(position);
+}
+
+void Cursor::move(CursorPosition position)
+{
+    switch (position)
+    {
+    case CursorPosition::BEGIN:
+        move_begin();
+        break;
+    case CursorPosition::END:
+        move_end();
+        break;
+    }
+}
+
+void Cursor::move_begin()
+{
+    this->cell_num = 0;
+    this->end_of_table = (table->pager->get_page(table->get_root_page_num())->get_num_cells() == 0);
+}
+
+void Cursor::move_end()
+{
+    this->cell_num = table->pager->get_page(this->page_num)->get_num_cells();
+    this->end_of_table = true;
 }
