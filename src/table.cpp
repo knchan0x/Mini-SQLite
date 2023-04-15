@@ -1,7 +1,7 @@
 #include <iostream>
 #include <string>
 
-#include "table.h"
+#include "table.hpp"
 
 void Row::print()
 {

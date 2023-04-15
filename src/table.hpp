@@ -16,7 +16,7 @@ struct Row
 
 // TODO: get the address directly using pointer?
 const uint32_t ID_SIZE = sizeof(Row::id);
-/* 1 padding bit for singular bit size */
+// 1 padding bit for singular bit size
 const uint32_t USERNAME_SIZE = sizeof(Row::username) % 2 ? sizeof(Row::username) + 1 : sizeof(Row::username);
 const uint32_t EMAIL_SIZE = sizeof(Row::email) % 2 ? sizeof(Row::email) + 1 : sizeof(Row::email);
 
@@ -50,9 +50,9 @@ enum class NodeType
     LEAF
 };
 
-/*
- * Common Node Header Layout
- */
+//
+// Common Node Header Layout
+//
 const uint32_t NODE_TYPE_SIZE = sizeof(NodeType::INTERNAL);
 const uint32_t NODE_TYPE_OFFSET = 0;
 const uint32_t IS_ROOT_SIZE = sizeof(bool);
@@ -71,16 +71,16 @@ struct Node
     Node(NodeType *nodeType, bool *isRoot, Node *parent);
 };
 
-/*
- * Leaf Node Header Layout
- */
+//
+// Leaf Node Header Layout
+//
 const uint32_t LEAF_NODE_NUM_CELLS_SIZE = sizeof(uint32_t);
 const uint32_t LEAF_NODE_NUM_CELLS_OFFSET = COMMON_NODE_HEADER_SIZE;
 const uint32_t LEAF_NODE_HEADER_SIZE = COMMON_NODE_HEADER_SIZE + LEAF_NODE_NUM_CELLS_SIZE;
 
-/*
- * Leaf Node Body Layout
- */
+//
+// Leaf Node Body Layout
+//
 const uint32_t LEAF_NODE_KEY_SIZE = sizeof(uint32_t);
 const uint32_t LEAF_NODE_KEY_OFFSET = 0;
 const uint32_t LEAF_NODE_VALUE_SIZE = ROW_SIZE;

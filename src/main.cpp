@@ -4,7 +4,7 @@
 #include <sstream>
 #include <vector>
 
-#include "table.h"
+#include "table.hpp"
 
 struct InputBuffer
 {
