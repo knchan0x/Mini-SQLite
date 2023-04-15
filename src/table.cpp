@@ -35,12 +35,27 @@ Row *Cell::get_value()
 
 void Cell::set_value(Row *row)
 {
-    *this->value = *row; // copy to // TODO: ok? or need to use memcpy?
+    *this->value = *row; // copy to
+}
+
+Cell *Cell::get_address()
+{
+    return (Cell *)this->key;
 }
 
 Node::Node(NodeType *nodeType, bool *isRoot, Node *parent)
     : nodeType(nodeType), isRoot(isRoot), parent(parent)
 {
+}
+
+NodeType Node::get_node_type()
+{
+    return *this->nodeType;
+}
+
+void Node::set_node_type(NodeType nodeType)
+{
+    *this->nodeType = nodeType;
 }
 
 LeafNode::LeafNode(NodeType *nodeType, bool *isRoot, Node *parent, uint32_t *num_cells)
@@ -188,9 +203,10 @@ LeafNode *Pager::get_page(uint32_t page_num)
             };
             file.seekg(page_num * PAGE_SIZE, std::ios::beg);
             file.read(data, PAGE_SIZE);
-            if (sizeof(data) == 0)
+            if (!file.eof() && file.fail())
             {
                 std::cout << "Error reading file: " << this->filename << std::endl;
+                file.close();
                 std::exit(EXIT_FAILURE);
             }
             file.close();
@@ -205,12 +221,22 @@ LeafNode *Pager::get_page(uint32_t page_num)
     }
 
     this->pages[page_num] = this->deserialize(this->page_data[page_num]);
-
     return this->pages[page_num];
 }
 
 LeafNode *Pager::deserialize(char *page_data)
 {
+
+    // page_data is a char[]
+    // all elements set to 0 by default
+    // LeafNode constructed by pointer to
+    // the array, so the default value
+    // of those elements are all set to 0
+    // i.e.
+    // nodeType = NodeType::Leaf (=0)
+    // isRoot = false (=0)
+    // parent = 0x000000000
+    // num_cells = 0
     LeafNode *node = new LeafNode(
         (NodeType *)(&page_data[NODE_TYPE_OFFSET]),
         (bool *)(&page_data[IS_ROOT_OFFSET]),
@@ -293,7 +319,7 @@ void Cursor::insert(uint32_t key, Row *value)
         // Make room for new cell
         for (uint32_t i = num_cells; i > this->cell_num; i--)
         {
-            memcpy(node->get_cell(i), node->get_cell(i - 1), LEAF_NODE_CELL_SIZE);
+            memcpy(node->get_cell(i)->get_address(), node->get_cell(i - 1)->get_address(), LEAF_NODE_CELL_SIZE);
         }
     }
 
@@ -321,6 +347,58 @@ void Cursor::move(CursorPosition position)
         move_end();
         break;
     }
+}
+
+//
+// Return the position of the given key.
+// If the key is not present, return the position
+// where it should be inserted
+//
+Cursor *Cursor::find(uint32_t key)
+{
+    uint32_t root_page_num = this->table->get_root_page_num();
+    LeafNode *root_node = this->table->pager->get_page(root_page_num);
+
+    if (root_node->get_node_type() == NodeType::LEAF)
+    {
+        return this->leaf_node_find(root_page_num, key);
+    }
+    else
+    {
+        std::cout << "Need to implement searching an internal node" << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
+}
+
+Cursor *Cursor::leaf_node_find(uint32_t page_num, uint32_t key)
+{
+    LeafNode *node = this->table->pager->get_page(page_num);
+    uint32_t num_cells = node->get_num_cells();
+
+    // Binary search
+    uint32_t min_index = 0;
+    uint32_t one_past_max_index = num_cells;
+    while (one_past_max_index != min_index)
+    {
+        uint32_t index = (min_index + one_past_max_index) / 2;
+        uint32_t key_at_index = node->get_cell(index)->get_key();
+        if (key == key_at_index)
+        {
+            this->cell_num = index;
+            return this;
+        }
+        if (key < key_at_index)
+        {
+            one_past_max_index = index;
+        }
+        else
+        {
+            min_index = index + 1;
+        }
+    }
+
+    this->cell_num = min_index;
+    return this;
 }
 
 void Cursor::move_begin()

@@ -3,6 +3,7 @@
 #include <array>
 #include <sstream>
 #include <vector>
+#include <algorithm>
 
 #include "table.hpp"
 
@@ -13,8 +14,9 @@ struct InputBuffer
 
 enum class ExecuteResult
 {
-    EXECUTE_SUCCESS,
-    EXECUTE_TABLE_FULL
+    SUCCESS,
+    DUPLICATE_KEY,
+    TABLE_FULL
 };
 
 enum class MetaCommandResult
@@ -26,9 +28,9 @@ enum class MetaCommandResult
 enum class PrepareResult
 {
     SUCCESS,
-    PREPARE_NEGATIVE_ID,
-    PREPARE_SYNTAX_ERROR,
-    PREPARE_STRING_TOO_LONG,
+    NEGATIVE_ID,
+    SYNTAX_ERROR,
+    STRING_TOO_LONG,
     UNRECOGNIZED_STATEMENT
 };
 
@@ -103,7 +105,7 @@ PrepareResult prepare_insert(InputBuffer *input_buffer, Statement *statement)
 
     if (tokens.size() > 4)
     {
-        return PrepareResult::PREPARE_SYNTAX_ERROR;
+        return PrepareResult::SYNTAX_ERROR;
     }
 
     std::string id_string = tokens[1];
@@ -113,15 +115,15 @@ PrepareResult prepare_insert(InputBuffer *input_buffer, Statement *statement)
     int id = atoi(id_string.c_str());
     if (id < 0)
     {
-        return PrepareResult::PREPARE_NEGATIVE_ID;
+        return PrepareResult::NEGATIVE_ID;
     }
     if (username.size() > COLUMN_USERNAME_SIZE)
     {
-        return PrepareResult::PREPARE_STRING_TOO_LONG;
+        return PrepareResult::STRING_TOO_LONG;
     }
     if (email.size() > COLUMN_EMAIL_SIZE)
     {
-        return PrepareResult::PREPARE_STRING_TOO_LONG;
+        return PrepareResult::STRING_TOO_LONG;
     }
 
     statement->row_to_insert.id = id;
@@ -163,16 +165,30 @@ void read_input(InputBuffer *input_buffer)
 
 ExecuteResult execute_insert(Statement *statement, Table *table)
 {
-    if ((table->pager->get_page(table->get_root_page_num())->get_num_cells() >= LEAF_NODE_MAX_CELLS))
+    auto page = table->pager->get_page(table->get_root_page_num());
+    uint32_t num_cells = page->get_num_cells();
+    if ((num_cells >= LEAF_NODE_MAX_CELLS))
     {
-        return ExecuteResult::EXECUTE_TABLE_FULL;
+        return ExecuteResult::TABLE_FULL;
     }
 
     auto cursor = std::make_unique<Cursor>(Cursor(table, CursorPosition::END));
     Row *row_to_insert = &(statement->row_to_insert);
-    cursor->insert(row_to_insert->id, row_to_insert);
+    uint32_t key_to_insert = row_to_insert->id;
+    cursor->find(key_to_insert);
 
-    return ExecuteResult::EXECUTE_SUCCESS;
+    if (cursor->cell_num < num_cells)
+    {
+        uint32_t key_at_index = page->get_cell(cursor->cell_num)->get_key();
+        if (key_at_index == key_to_insert)
+        {
+            return ExecuteResult::DUPLICATE_KEY;
+        }
+    }
+
+    cursor->insert(key_to_insert, row_to_insert);
+
+    return ExecuteResult::SUCCESS;
 }
 
 ExecuteResult execute_select(Statement *statement, Table *table)
@@ -183,7 +199,7 @@ ExecuteResult execute_select(Statement *statement, Table *table)
         cursor->table->pager->get_page(cursor->page_num)->get_cell(cursor->cell_num)->get_value()->print();
         cursor->advance();
     };
-    return ExecuteResult::EXECUTE_SUCCESS;
+    return ExecuteResult::SUCCESS;
 }
 
 ExecuteResult execute_statement(Statement *statement, Table *table)
@@ -227,13 +243,13 @@ int main(int argc, char *argv[])
         {
         case PrepareResult::SUCCESS:
             break;
-        case PrepareResult::PREPARE_NEGATIVE_ID:
+        case PrepareResult::NEGATIVE_ID:
             std::cout << "ID must be positive." << std::endl;
             continue;
-        case PrepareResult::PREPARE_STRING_TOO_LONG:
+        case PrepareResult::STRING_TOO_LONG:
             std::cout << "String is too long." << std::endl;
             continue;
-        case (PrepareResult::PREPARE_SYNTAX_ERROR):
+        case (PrepareResult::SYNTAX_ERROR):
             std::cout << "Syntax error. Could not parse statement." << std::endl;
             continue;
         case PrepareResult::UNRECOGNIZED_STATEMENT:
@@ -243,10 +259,13 @@ int main(int argc, char *argv[])
 
         switch (execute_statement(statement, table))
         {
-        case (ExecuteResult::EXECUTE_SUCCESS):
+        case (ExecuteResult::SUCCESS):
             std::cout << "Executed." << std::endl;
             break;
-        case (ExecuteResult::EXECUTE_TABLE_FULL):
+        case (ExecuteResult::DUPLICATE_KEY):
+            std::cout << "Error: Duplicate key." << std::endl;
+            break;
+        case (ExecuteResult::TABLE_FULL):
             std::cout << "Error: Table full." << std::endl;
             break;
         }

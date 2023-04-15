@@ -14,16 +14,20 @@ struct Row
     void print();
 };
 
-// TODO: get the address directly using pointer?
+// padding may vary by complier and os
 const uint32_t ID_SIZE = sizeof(Row::id);
-// 1 padding bit for singular bit size
-const uint32_t USERNAME_SIZE = sizeof(Row::username) % 2 ? sizeof(Row::username) + 1 : sizeof(Row::username);
-const uint32_t EMAIL_SIZE = sizeof(Row::email) % 2 ? sizeof(Row::email) + 1 : sizeof(Row::email);
+const uint32_t USERNAME_SIZE = sizeof(Row::username);
+// const uint32_t USERNAME_PADDING = (uint64_t)&((Row*)0)->email - (uint64_t)&((Row*)0)->username - USERNAME_SIZE;
+const uint32_t USERNAME_PADDING = 0;
+const uint32_t EMAIL_SIZE = sizeof(Row::email);
+// const uint32_t EMAIL_PADDING = sizeof(Row) - (uint64_t)&((Row*)0)->email - EMAIL_SIZE;
+const uint32_t EMAIL_PADDING = 3;
+const uint32_t STRUCT_PADDING = USERNAME_PADDING + EMAIL_PADDING;
 
 const uint32_t ID_OFFSET = 0;
-const uint32_t USERNAME_OFFSET = ID_OFFSET + ID_SIZE;
-const uint32_t EMAIL_OFFSET = USERNAME_OFFSET + USERNAME_SIZE;
-const uint32_t ROW_SIZE = ID_SIZE + USERNAME_SIZE + EMAIL_SIZE;
+const uint32_t USERNAME_OFFSET = ID_OFFSET + ID_SIZE ;
+const uint32_t EMAIL_OFFSET = USERNAME_OFFSET + USERNAME_SIZE + USERNAME_PADDING;
+const uint32_t ROW_SIZE = ID_SIZE + USERNAME_SIZE + EMAIL_SIZE + STRUCT_PADDING;
 
 const uint32_t TABLE_MAX_PAGES = 100;
 const uint32_t PAGE_SIZE = 4096;
@@ -35,6 +39,7 @@ class Cell
     Row *value;
 
 public:
+
     Cell(uint32_t *key, Row *value);
 
     uint32_t get_key();
@@ -42,12 +47,14 @@ public:
 
     Row *get_value();
     void set_value(Row *row);
+
+    Cell *get_address();
 };
 
 enum class NodeType
 {
-    INTERNAL,
-    LEAF
+    LEAF,
+    INTERNAL
 };
 
 //
@@ -61,14 +68,20 @@ const uint32_t PARENT_POINTER_SIZE = sizeof(nullptr_t);
 const uint32_t PARENT_POINTER_OFFSET = IS_ROOT_OFFSET + IS_ROOT_SIZE;
 const uint32_t COMMON_NODE_HEADER_SIZE = NODE_TYPE_SIZE + IS_ROOT_SIZE + PARENT_POINTER_SIZE;
 
-struct Node
+class Node
 {
+private:
     // Node Header
     NodeType *nodeType;
+
+public:
     bool *isRoot;
     Node *parent;
 
     Node(NodeType *nodeType, bool *isRoot, Node *parent);
+
+    NodeType get_node_type();
+    void set_node_type(NodeType nodeType);
 };
 
 //
@@ -127,6 +140,7 @@ public:
     void flush(uint32_t page_num);
     LeafNode *get_page(uint32_t page_num);
     LeafNode *deserialize(char *page_data);
+    LeafNode *initialize_page(char *page_data);
 };
 
 struct Table
@@ -143,7 +157,8 @@ public:
     uint32_t get_root_page_num();
 };
 
-enum class CursorPosition {
+enum class CursorPosition
+{
     BEGIN,
     END
 };
@@ -162,6 +177,8 @@ struct Cursor
     Row *value();
     void advance();
 
+    Cursor *find(uint32_t key);
+    Cursor *leaf_node_find(uint32_t page_num, uint32_t key);
     void insert(uint32_t key, Row *value);
 
 private:
