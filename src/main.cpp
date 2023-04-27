@@ -15,8 +15,7 @@ struct InputBuffer
 enum class ExecuteResult
 {
     SUCCESS,
-    DUPLICATE_KEY,
-    TABLE_FULL
+    DUPLICATE_KEY
 };
 
 enum class MetaCommandResult
@@ -54,7 +53,14 @@ struct Statement
 void print_constants()
 {
     std::cout << "ROW_SIZE: " << ROW_SIZE << std::endl;
+
     std::cout << "COMMON_NODE_HEADER_SIZE: " << COMMON_NODE_HEADER_SIZE << std::endl;
+
+    std::cout << "INTERNAL_NODE_HEADER_SIZE: " << INTERNAL_NODE_HEADER_SIZE << std::endl;
+    std::cout << "INTERNAL_NODE_CELL_SIZE: " << INTERNAL_NODE_CELL_SIZE << std::endl;
+    std::cout << "INTERNAL_NODE_SPACE_FOR_CELLS: " << INTERNAL_NODE_SPACE_FOR_CELLS << std::endl;
+    std::cout << "INTERNAL_NODE_MAX_CELLS: " << INTERNAL_NODE_MAX_CELLS << std::endl;
+
     std::cout << "LEAF_NODE_HEADER_SIZE: " << LEAF_NODE_HEADER_SIZE << std::endl;
     std::cout << "LEAF_NODE_CELL_SIZE: " << LEAF_NODE_CELL_SIZE << std::endl;
     std::cout << "LEAF_NODE_SPACE_FOR_CELLS: " << LEAF_NODE_SPACE_FOR_CELLS << std::endl;
@@ -72,7 +78,8 @@ MetaCommandResult do_meta_command(InputBuffer *input_buffer, Table *table)
     else if (input_buffer->buffer.find(".btree") == 0)
     {
         std::cout << "Tree:" << std::endl;
-        table->pager->get_page(0)->print();
+        InternalNode *node = (InternalNode *)table->pager->get_page(0);
+        table->pager->print_tree(0, 0);
         return MetaCommandResult::SUCCESS;
     }
     else if (input_buffer->buffer.find(".constant") == 0)
@@ -87,9 +94,9 @@ MetaCommandResult do_meta_command(InputBuffer *input_buffer, Table *table)
     }
 }
 
-#define INSERT_POSITION_ID = 1
-#define INSERT_POSITION_USERNAME = 2
-#define INSERT_POSITION_EMAIL = 3
+const uint32_t INSERT_POSITION_ID = 1;
+const uint32_t INSERT_POSITION_USERNAME = 2;
+const uint32_t INSERT_POSITION_EMAIL = 3;
 
 PrepareResult prepare_insert(InputBuffer *input_buffer, Statement *statement)
 {
@@ -108,9 +115,9 @@ PrepareResult prepare_insert(InputBuffer *input_buffer, Statement *statement)
         return PrepareResult::SYNTAX_ERROR;
     }
 
-    std::string id_string = tokens[1];
-    std::string username = tokens[2];
-    std::string email = tokens[3];
+    std::string id_string = tokens[INSERT_POSITION_ID];
+    std::string username = tokens[INSERT_POSITION_USERNAME];
+    std::string email = tokens[INSERT_POSITION_EMAIL];
 
     int id = atoi(id_string.c_str());
     if (id < 0)
@@ -159,18 +166,14 @@ void read_input(InputBuffer *input_buffer)
     if (input_buffer->buffer.size() <= 0)
     {
         std::cout << "Error reading input" << std::endl;
-        exit(EXIT_FAILURE);
+        std::exit(EXIT_FAILURE);
     }
 }
 
 ExecuteResult execute_insert(Statement *statement, Table *table)
 {
-    auto page = table->pager->get_page(table->get_root_page_num());
+    auto page = (LeafNode *)table->pager->get_page(table->get_root_page_num());
     uint32_t num_cells = page->get_num_cells();
-    if ((num_cells >= LEAF_NODE_MAX_CELLS))
-    {
-        return ExecuteResult::TABLE_FULL;
-    }
 
     auto cursor = std::make_unique<Cursor>(Cursor(table, CursorPosition::END));
     Row *row_to_insert = &(statement->row_to_insert);
@@ -196,7 +199,8 @@ ExecuteResult execute_select(Statement *statement, Table *table)
     auto cursor = std::make_unique<Cursor>(Cursor(table, CursorPosition::BEGIN));
     while (!cursor->end_of_table)
     {
-        cursor->table->pager->get_page(cursor->page_num)->get_cell(cursor->cell_num)->get_value()->print();
+        auto *page = (LeafNode *)(cursor->table->pager->get_page(cursor->page_num));
+        page->get_cell(cursor->cell_num)->get_value()->print();
         cursor->advance();
     };
     return ExecuteResult::SUCCESS;
@@ -220,26 +224,27 @@ int main(int argc, char *argv[])
         std::cout << "Must supply a database filename." << std::endl;
         std::exit(EXIT_FAILURE);
     }
+
     Table *table = new Table(argv[1]);
-    InputBuffer *input_buffer = new InputBuffer;
+    InputBuffer input_buffer = InputBuffer();
     while (true)
     {
         print_prompt();
-        read_input(input_buffer);
-        if (input_buffer->buffer.find(".") == 0)
+        read_input(&input_buffer);
+        if (input_buffer.buffer.find(".") == 0)
         {
-            switch (do_meta_command(input_buffer, table))
+            switch (do_meta_command(&input_buffer, table))
             {
             case MetaCommandResult::SUCCESS:
                 continue;
             case MetaCommandResult::UNRECOGNIZED_COMMAND:
-                std::cout << "Unrecognized command " << input_buffer->buffer << std::endl;
+                std::cout << "Unrecognized command " << input_buffer.buffer << std::endl;
                 continue;
             }
         }
 
         Statement *statement = new Statement;
-        switch (prepare_statement(input_buffer, statement))
+        switch (prepare_statement(&input_buffer, statement))
         {
         case PrepareResult::SUCCESS:
             break;
@@ -249,24 +254,21 @@ int main(int argc, char *argv[])
         case PrepareResult::STRING_TOO_LONG:
             std::cout << "String is too long." << std::endl;
             continue;
-        case (PrepareResult::SYNTAX_ERROR):
+        case PrepareResult::SYNTAX_ERROR:
             std::cout << "Syntax error. Could not parse statement." << std::endl;
             continue;
         case PrepareResult::UNRECOGNIZED_STATEMENT:
-            std::cout << "Unrecognized keyword at start of " << input_buffer->buffer << std::endl;
+            std::cout << "Unrecognized keyword at start of " << input_buffer.buffer << std::endl;
             continue;
         }
 
         switch (execute_statement(statement, table))
         {
-        case (ExecuteResult::SUCCESS):
+        case ExecuteResult::SUCCESS:
             std::cout << "Executed." << std::endl;
             break;
-        case (ExecuteResult::DUPLICATE_KEY):
+        case ExecuteResult::DUPLICATE_KEY:
             std::cout << "Error: Duplicate key." << std::endl;
-            break;
-        case (ExecuteResult::TABLE_FULL):
-            std::cout << "Error: Table full." << std::endl;
             break;
         }
     }
