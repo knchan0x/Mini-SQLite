@@ -264,6 +264,7 @@ struct Cursor
 
     Cursor *find(uint32_t key);
     Cursor *leaf_node_find(uint32_t page_num, uint32_t key);
+    Cursor *internal_node_find(uint32_t page_num, uint32_t key);
     void insert(uint32_t key, Row *value);
     Node *split_and_insert(uint32_t key, Row *value);
 

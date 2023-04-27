@@ -71,7 +71,6 @@ MetaCommandResult do_meta_command(InputBuffer *input_buffer, Table *table)
 {
     if (input_buffer->buffer.find(".exit") == 0)
     {
-        delete input_buffer;
         delete table;
         std::exit(EXIT_SUCCESS);
     }
@@ -188,7 +187,7 @@ ExecuteResult execute_insert(Statement *statement, Table *table)
             return ExecuteResult::DUPLICATE_KEY;
         }
     }
-
+    
     cursor->insert(key_to_insert, row_to_insert);
 
     return ExecuteResult::SUCCESS;

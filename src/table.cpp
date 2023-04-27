@@ -393,12 +393,10 @@ char *Pager::new_page_data()
 
 Node *Pager::deserialize(char *page_data)
 {
-    NodeType nodeType = *(NodeType *)(&page_data[NODE_TYPE_OFFSET]);
-
     // switch to create node
     // separate to different functions
     // to avoid conflict
-    switch (nodeType)
+    switch (*(NodeType *)(&page_data[NODE_TYPE_OFFSET]))
     {
     case NodeType::INTERNAL:
         return this->deserialize_internal(page_data);
@@ -514,8 +512,7 @@ void Pager::print_tree(uint32_t page_num, uint32_t indentation_level)
 {
     Node *node = this->get_page(page_num);
 
-    NodeType nodeType = node->get_node_type();
-    switch (nodeType)
+    switch (node->get_node_type())
     {
     case NodeType::INTERNAL:
         print_internal(node, indentation_level);
@@ -759,14 +756,17 @@ Cursor *Cursor::find(uint32_t key)
     }
     else
     {
-        std::cout << "Need to implement searching an internal node" << std::endl;
-        std::exit(EXIT_FAILURE);
+        return this->internal_node_find(root_page_num, key);
     }
 }
 
 Cursor *Cursor::leaf_node_find(uint32_t page_num, uint32_t key)
 {
-    LeafNode *node = (LeafNode *)this->table->pager->get_page(this->page_num);
+    InternalNode *a_root = (InternalNode *)this->table->pager->get_page(0);
+    LeafNode *b_leaf = (LeafNode *)this->table->pager->get_page(1);
+    LeafNode *c_leaf = (LeafNode *)this->table->pager->get_page(2);
+
+    LeafNode *node = (LeafNode *)this->table->pager->get_page(page_num);
     uint32_t num_cells = node->get_num_cells();
 
     // Binary search
@@ -793,6 +793,40 @@ Cursor *Cursor::leaf_node_find(uint32_t page_num, uint32_t key)
 
     this->cell_num = min_index;
     return this;
+}
+
+Cursor *Cursor::internal_node_find(uint32_t page_num, uint32_t key)
+{
+    InternalNode *node = (InternalNode *)this->table->pager->get_page(page_num);
+    uint32_t num_keys = node->get_num_keys();
+
+    // Binary search to find index of child to search
+    uint32_t min_index = 0;
+    uint32_t max_index = num_keys; // there is one more child than key
+
+    while (min_index != max_index)
+    {
+        uint32_t index = (min_index + max_index) / 2;
+        uint32_t key_to_right = node->get_key(index);
+        if (key_to_right >= key)
+        {
+            max_index = index;
+        }
+        else
+        {
+            min_index = index + 1;
+        }
+    }
+
+    uint32_t child_num = node->get_child(min_index);
+    Node *child = this->table->pager->get_page(child_num);
+    switch (child->get_node_type())
+    {
+    case NodeType::LEAF:
+        return this->leaf_node_find(child_num, key);
+    case NodeType::INTERNAL:
+        return this->internal_node_find(child_num, key);
+    }
 }
 
 void Cursor::move_begin()
