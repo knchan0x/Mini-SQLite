@@ -171,14 +171,14 @@ void read_input(InputBuffer *input_buffer)
 
 ExecuteResult execute_insert(Statement *statement, Table *table)
 {
-    auto page = (LeafNode *)table->pager->get_page(table->get_root_page_num());
-    uint32_t num_cells = page->get_num_cells();
-
-    auto cursor = std::make_unique<Cursor>(Cursor(table, CursorPosition::END));
+    auto cursor = std::make_unique<Cursor>(Cursor(table));
     Row *row_to_insert = &(statement->row_to_insert);
     uint32_t key_to_insert = row_to_insert->id;
     cursor->find(key_to_insert);
 
+    // auto page = (LeafNode *)table->pager->get_page(table->get_root_page_num());
+    auto page = (LeafNode *)table->pager->get_page(cursor->page_num);
+    uint32_t num_cells = page->get_num_cells();
     if (cursor->cell_num < num_cells)
     {
         uint32_t key_at_index = page->get_cell(cursor->cell_num)->get_key();
@@ -195,9 +195,10 @@ ExecuteResult execute_insert(Statement *statement, Table *table)
 
 ExecuteResult execute_select(Statement *statement, Table *table)
 {
-    auto cursor = std::make_unique<Cursor>(Cursor(table, CursorPosition::BEGIN));
+    auto cursor = std::make_unique<Cursor>(Cursor(table));
     while (!cursor->end_of_table)
     {
+        // TODO: not LeafNode
         auto *page = (LeafNode *)(cursor->table->pager->get_page(cursor->page_num));
         page->get_cell(cursor->cell_num)->get_value()->print();
         cursor->advance();
