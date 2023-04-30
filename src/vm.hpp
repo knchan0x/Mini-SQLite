@@ -2,29 +2,41 @@
 
 #include "processor.hpp"
 
-struct Cursor
+enum class CursorPosition
 {
+    BEGIN,
+    END
+};
+
+class Cursor
+{
+private:
+    // functions
+    
+    void move_begin();
+
+    Cursor *leaf_node_find(uint32_t page_num, uint32_t key);
+    Cursor *internal_node_find(uint32_t page_num, uint32_t key);
+
+    void split_and_insert(uint32_t key, Row *value);
+    void insert_internal_node(uint32_t parent_page_num, uint32_t child_page_num);
+
+public:
+    // variables
+
     Table *table;
     uint32_t page_num;
     uint32_t cell_num;
     bool end_of_table; // Indicates is the cursor locate in a position after the last element
 
+    // functions
+
     Cursor(Table *table);
 
-    void move(CursorPosition position);
-
-    Row *value();
-    void advance();
-
-    Cursor *find(uint32_t key);
-    Cursor *leaf_node_find(uint32_t page_num, uint32_t key);
-    Cursor *internal_node_find(uint32_t page_num, uint32_t key);
     void insert(uint32_t key, Row *value);
-    void split_and_insert(uint32_t key, Row *value);
+    Cursor *find(uint32_t key);
 
-private:
-    void move_begin();
-    void move_end();
+    void advance();
 };
 
 enum class ExecuteResult

@@ -2,10 +2,18 @@
 
 #include "vm.hpp"
 
-Row *Cursor::value()
+Cursor::Cursor(Table *table)
+    : table(table)
 {
-    LeafNode *node = (LeafNode *)this->table->pager->get_page(this->page_num);
-    return node->get_cell(this->cell_num)->get_value();
+    this->page_num = table->get_root();
+    this->move_begin();
+}
+
+void Cursor::move_begin()
+{
+    this->find(0);
+    auto *node = (LeafNode *)this->table->pager->get_page(this->page_num);
+    this->end_of_table = (node->get_num_cells() == 0);
 }
 
 void Cursor::advance()
@@ -14,14 +22,14 @@ void Cursor::advance()
     this->cell_num += 1;
     if (this->cell_num >= node->get_num_cells())
     {
-        if (node->get_next_leaf_num() == 0)
+        if (node->get_next_leaf() == 0)
         {
             // This was rightmost leaf
             this->end_of_table = true;
         }
         else
         {
-            this->page_num = node->get_next_leaf_num();
+            this->page_num = node->get_next_leaf();
             this->cell_num = 0;
         }
     }
@@ -49,7 +57,7 @@ void Cursor::insert(uint32_t key, Row *value)
     }
 
     node->set_num_cells(num_cells + 1);
-    LeafNodeCell *cell = node->get_cell(this->cell_num); // TODO: operator reload []
+    LeafNodeCell *cell = node->get_cell(this->cell_num);
     cell->set_key(key);
     cell->set_value(value);
 }
@@ -104,13 +112,13 @@ void Cursor::split_and_insert(uint32_t key, Row *value)
     new_node->set_num_cells(LEAF_NODE_RIGHT_SPLIT_COUNT);
 
     // Update next leaf
-    new_node->set_next_leaf_num(old_node->get_next_leaf_num());
+    new_node->set_next_leaf_num(old_node->get_next_leaf());
     old_node->set_next_leaf_num(new_page_num);
 
     // Update root node
     if (old_node->get_node_root())
     {
-        this->table->create_new_root(new_page_num);
+        this->table->new_root(new_page_num);
     }
     else
     {
@@ -119,27 +127,47 @@ void Cursor::split_and_insert(uint32_t key, Row *value)
         auto *parent = (InternalNode *)this->table->pager->get_page(parent_page_num);
 
         parent->update_key(old_max, new_max);
-        this->table->internal_node_insert(parent_page_num, new_page_num);
+        this->insert_internal_node(parent_page_num, new_page_num);
     }
 }
 
-Cursor::Cursor(Table *table)
-    : table(table)
+void Cursor::insert_internal_node(uint32_t parent_page_num, uint32_t child_page_num)
 {
-    this->page_num = table->get_root_page_num();
-    this->move(CursorPosition::BEGIN);
-}
+    //
+    // Add a new child/key pair to parent that corresponds to child
+    //
 
-void Cursor::move(CursorPosition position)
-{
-    switch (position)
+    auto *parent = (InternalNode *)this->table->pager->get_page(parent_page_num);
+    auto *child = (LeafNode *)this->table->pager->get_page(child_page_num);
+    uint32_t child_max_key = child->get_max_key();
+    uint32_t index = parent->find_child(child_max_key);
+
+    uint32_t original_num_keys = parent->get_num_keys();
+    parent->set_num_keys(original_num_keys + 1);
+
+    if (original_num_keys >= INTERNAL_NODE_MAX_CELLS)
     {
-    case CursorPosition::BEGIN:
-        move_begin();
-        break;
-    case CursorPosition::END:
-        move_end();
-        break;
+        std::cout << "Need to implement splitting internal node" << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
+
+    uint32_t right_child_page_num = parent->get_right_child();
+    auto *right_child = (LeafNode *)this->table->pager->get_page(right_child_page_num);
+
+    if (child_max_key > right_child->get_max_key())
+    {
+        // Replace right child
+        parent->set_cell(original_num_keys, right_child->get_max_key(), right_child_page_num);
+        parent->set_right_child(child_page_num);
+    }
+    else
+    {
+        // Make room for the new cell
+        for (uint32_t i = original_num_keys; i > index; i--)
+        {
+            parent->copy_cell(i, i - 1);
+        }
+        parent->set_cell(index, child_max_key, child_page_num);
     }
 }
 
@@ -152,7 +180,7 @@ void Cursor::move(CursorPosition position)
 //
 Cursor *Cursor::find(uint32_t key)
 {
-    uint32_t root_page_num = this->table->get_root_page_num();
+    uint32_t root_page_num = this->table->get_root();
     Node *root_node = this->table->pager->get_page(root_page_num);
 
     if (root_node->get_node_type() == NodeType::LEAF)
@@ -203,7 +231,7 @@ Cursor *Cursor::internal_node_find(uint32_t page_num, uint32_t key)
     InternalNode *node = (InternalNode *)this->table->pager->get_page(page_num);
 
     uint32_t child_index = node->find_child(key);
-    uint32_t child_num = node->get_child(child_index);
+    uint32_t child_num = node->get_child_at_cell(child_index);
     Node *child = this->table->pager->get_page(child_num);
 
     switch (child->get_node_type())
@@ -215,18 +243,7 @@ Cursor *Cursor::internal_node_find(uint32_t page_num, uint32_t key)
     }
 }
 
-void Cursor::move_begin()
-{
-    this->find(0);
-    auto *node = (LeafNode *)this->table->pager->get_page(this->page_num);
-    this->end_of_table = (node->get_num_cells() == 0);
-}
 
-void Cursor::move_end()
-{
-    std::cout << "Not yet implemented move_end for cursor." << std::endl;
-    std::exit(EXIT_FAILURE);
-}
 
 VirtualMachine::VirtualMachine(Table *table)
     : table(table)
@@ -253,8 +270,8 @@ ExecuteResult VirtualMachine::execute(Statement *statement)
 ExecuteResult VirtualMachine::print_tree()
 {
     std::cout << "Tree:" << std::endl;
-    InternalNode *node = (InternalNode *)table->pager->get_page(0);
-    table->pager->print_tree(0, 0);
+    InternalNode *node = (InternalNode *)this->table->pager->get_page(0);
+    this->table->pager->print_tree(0, 0);
     return ExecuteResult::SUCCESS;
 }
 
