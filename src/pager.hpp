@@ -9,7 +9,7 @@ class Pager
 public:
     // functions
 
-    Pager(std::string filename);
+    Pager(const std::string &filename);
     ~Pager();
 
     Node *get_page(uint32_t page_num);

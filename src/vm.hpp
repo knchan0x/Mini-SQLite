@@ -15,11 +15,11 @@ class Cursor
 public:
     // variables
 
-    Table *table;
+    Table &table;
 
     // functions
 
-    Cursor(Table *table);
+    Cursor(Table &table);
 
     uint32_t get_page_num();
     uint32_t get_cell_num();

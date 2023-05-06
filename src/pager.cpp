@@ -3,7 +3,7 @@
 
 #include "pager.hpp"
 
-Pager::Pager(std::string filename)
+Pager::Pager(const std::string &filename)
 {
     this->filename = filename;
     std::ifstream file = std::ifstream(filename, std::ios::ate | std::ios::binary);
@@ -289,7 +289,7 @@ void Pager::print_tree(uint32_t page_num, uint32_t indentation_level)
 void Pager::print_internal(Node *node, uint32_t indentation_level)
 {
     uint32_t num_keys, child;
-    InternalNode *node_internal = (InternalNode *)node;
+    auto node_internal = static_cast<InternalNode *>(node);
     num_keys = node_internal->get_num_keys();
     indent(indentation_level);
     std::cout << "- internal (size " << num_keys << ")" << std::endl;
@@ -309,7 +309,7 @@ void Pager::print_internal(Node *node, uint32_t indentation_level)
 void Pager::print_leaf(Node *node, uint32_t indentation_level)
 {
     uint32_t num_keys, child;
-    LeafNode *node_leaf = (LeafNode *)node;
+    auto node_leaf = static_cast<LeafNode *>(node);
     num_keys = node_leaf->get_num_cells();
     indent(indentation_level);
     std::cout << "- leaf (size " << num_keys << ")" << std::endl;

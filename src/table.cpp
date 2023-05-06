@@ -3,7 +3,7 @@
 
 #include "table.hpp"
 
-Table::Table(std::string filename)
+Table::Table(const std::string &filename)
 {
     this->root_page_num = 0;
     this->pager = new Pager(filename);
@@ -34,7 +34,7 @@ uint32_t Table::get_root()
     return this->root_page_num;
 }
 
-Node *Table::new_root(uint32_t page_num)
+Node &Table::new_root(uint32_t page_num)
 {
     // Handle splitting the root.
     // Old root copied to new page, becomes left child.
@@ -42,19 +42,19 @@ Node *Table::new_root(uint32_t page_num)
     // Re-initialize root page to contain the new root node.
     // New root node points to two children.
 
-    LeafNode *old_root = (LeafNode *)this->pager->get_page(this->root_page_num);
+    auto old_root = static_cast<LeafNode *>(this->pager->get_page(this->root_page_num));
     uint32_t left_child_page_num = this->pager->get_unused_page_num();
-    LeafNode *left_child = (LeafNode *)this->pager->get_page(left_child_page_num);
+    auto left_child = static_cast<LeafNode *>(this->pager->get_page(left_child_page_num));
 
     // Left child has data copied from old root
     this->pager->copy_node_data(left_child_page_num, root_page_num);
     left_child->set_node_root(false);
 
     // Root node is a new internal node with one key and two children
-    InternalNode *new_root = (InternalNode *)this->pager->set_node_type(root_page_num, NodeType::INTERNAL);
+    auto new_root = static_cast<InternalNode *>(this->pager->set_node_type(root_page_num, NodeType::INTERNAL));
     new_root->set_node_root(true);
     new_root->set_num_keys(1);
     new_root->set_right_child(page_num);
     new_root->set_cell(0, left_child->get_max_key(), left_child_page_num);
-    return new_root;
+    return *new_root;
 }

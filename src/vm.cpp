@@ -2,23 +2,23 @@
 
 #include "vm.hpp"
 
-Cursor::Cursor(Table *table)
+Cursor::Cursor(Table &table)
     : table(table)
 {
-    this->page_num = table->get_root();
+    this->page_num = this->table.get_root();
     this->move_begin();
 }
 
 void Cursor::move_begin()
 {
     this->find(0);
-    auto *node = (LeafNode *)this->table->pager->get_page(this->page_num);
+    auto node = static_cast<LeafNode *>(this->table.pager->get_page(this->page_num));
     this->end_of_table = (node->get_num_cells() == 0);
 }
 
 void Cursor::advance()
 {
-    LeafNode *node = (LeafNode *)this->table->pager->get_page(this->page_num);
+    auto node = static_cast<LeafNode *>(this->table.pager->get_page(this->page_num));
     this->cell_num += 1;
     if (this->cell_num >= node->get_num_cells())
     {
@@ -37,7 +37,7 @@ void Cursor::advance()
 
 void Cursor::insert(uint32_t key, const Row& value)
 {
-    LeafNode *node = (LeafNode *)this->table->pager->get_page(this->page_num);
+    auto node = static_cast<LeafNode *>(this->table.pager->get_page(this->page_num));
 
     uint32_t num_cells = node->get_num_cells();
     if (num_cells >= LEAF_NODE_MAX_CELLS)
@@ -71,10 +71,10 @@ void Cursor::split_and_insert(uint32_t key, const Row& value)
     // Insert the new value in one of the two nodes.
     // Update parent or create a new parent.
 
-    LeafNode *old_node = (LeafNode *)this->table->pager->get_page(this->page_num);
+    auto old_node = static_cast<LeafNode *>(this->table.pager->get_page(this->page_num));
     uint32_t old_max = old_node->get_max_key();
-    uint32_t new_page_num = this->table->pager->get_unused_page_num();
-    LeafNode *new_node = (LeafNode *)this->table->pager->get_page(new_page_num);
+    uint32_t new_page_num = this->table.pager->get_unused_page_num();
+    auto new_node = static_cast<LeafNode *>(this->table.pager->get_page(new_page_num));
     new_node->set_parent(old_node->get_parent());
 
     // All existing keys plus new key should be divided
@@ -101,7 +101,7 @@ void Cursor::split_and_insert(uint32_t key, const Row& value)
         }
         else
         {
-            this->table->pager->copy_node_cell(
+            this->table.pager->copy_node_cell(
                 destination_node, i % LEAF_NODE_LEFT_SPLIT_COUNT,
                 old_node, i > this->cell_num ? i - 1 : i);
         }
@@ -118,13 +118,13 @@ void Cursor::split_and_insert(uint32_t key, const Row& value)
     // Update root node
     if (old_node->get_node_root())
     {
-        this->table->new_root(new_page_num);
+        this->table.new_root(new_page_num);
     }
     else
     {
         uint32_t parent_page_num = old_node->get_parent();
         uint32_t new_max = old_node->get_max_key();
-        auto *parent = (InternalNode *)this->table->pager->get_page(parent_page_num);
+        auto parent = static_cast<InternalNode *>(this->table.pager->get_page(parent_page_num));
 
         parent->update_key(old_max, new_max);
         this->insert_internal_node(parent_page_num, new_page_num);
@@ -137,8 +137,8 @@ void Cursor::insert_internal_node(uint32_t parent_page_num, uint32_t child_page_
     // Add a new child/key pair to parent that corresponds to child
     //
 
-    auto *parent = (InternalNode *)this->table->pager->get_page(parent_page_num);
-    auto *child = (LeafNode *)this->table->pager->get_page(child_page_num);
+    auto parent = static_cast<InternalNode *>(this->table.pager->get_page(parent_page_num));
+    auto child = static_cast<LeafNode *>(this->table.pager->get_page(child_page_num));
     uint32_t child_max_key = child->get_max_key();
     uint32_t index = parent->find_child(child_max_key);
 
@@ -152,7 +152,7 @@ void Cursor::insert_internal_node(uint32_t parent_page_num, uint32_t child_page_
     }
 
     uint32_t right_child_page_num = parent->get_right_child();
-    auto *right_child = (LeafNode *)this->table->pager->get_page(right_child_page_num);
+    auto right_child = static_cast<LeafNode *>(this->table.pager->get_page(right_child_page_num));
 
     if (child_max_key > right_child->get_max_key())
     {
@@ -178,8 +178,8 @@ void Cursor::insert_internal_node(uint32_t parent_page_num, uint32_t child_page_
 //
 void Cursor::find(uint32_t key)
 {
-    uint32_t root_page_num = this->table->get_root();
-    Node *root_node = this->table->pager->get_page(root_page_num);
+    uint32_t root_page_num = this->table.get_root();
+    Node *root_node = this->table.pager->get_page(root_page_num);
 
     if (root_node->get_node_type() == NodeType::LEAF)
     {
@@ -193,7 +193,7 @@ void Cursor::find(uint32_t key)
 
 void Cursor::leaf_node_find(uint32_t page_num, uint32_t key)
 {
-    LeafNode *node = (LeafNode *)this->table->pager->get_page(page_num);
+    auto node = static_cast<LeafNode *>(this->table.pager->get_page(page_num));
     uint32_t num_cells = node->get_num_cells();
 
     // Binary search
@@ -224,11 +224,11 @@ void Cursor::leaf_node_find(uint32_t page_num, uint32_t key)
 
 void Cursor::internal_node_find(uint32_t page_num, uint32_t key)
 {
-    InternalNode *node = (InternalNode *)this->table->pager->get_page(page_num);
+    auto node = static_cast<InternalNode *>(this->table.pager->get_page(page_num));
 
     uint32_t child_index = node->find_child(key);
     uint32_t child_num = node->get_child_at_cell(child_index);
-    Node *child = this->table->pager->get_page(child_num);
+    Node *child = this->table.pager->get_page(child_num);
 
     switch (child->get_node_type())
     {
@@ -273,7 +273,7 @@ ExecuteResult VirtualMachine::execute(const Statement& statement)
 ExecuteResult VirtualMachine::print_tree()
 {
     std::cout << "Tree:" << std::endl;
-    InternalNode *node = (InternalNode *)this->table->pager->get_page(0);
+    auto node = static_cast<InternalNode *>(this->table->pager->get_page(0));
     this->table->pager->print_tree(0, 0);
     return ExecuteResult::SUCCESS;
 }
@@ -301,11 +301,11 @@ ExecuteResult VirtualMachine::print_constants()
 
 ExecuteResult VirtualMachine::execute_insert(const Statement& statement)
 {
-    auto cursor = std::make_unique<Cursor>(Cursor(this->table));
+    auto cursor = std::make_unique<Cursor>(Cursor(*this->table));
     uint32_t key_to_insert = statement.row_to_insert.id;
     cursor->find(key_to_insert);
 
-    auto page = (LeafNode *)cursor->table->pager->get_page(cursor->get_page_num());
+    auto page = static_cast<LeafNode *>(cursor->table.pager->get_page(cursor->get_page_num()));
     uint32_t num_cells = page->get_num_cells();
     if (cursor->get_cell_num() < num_cells)
     {
@@ -323,10 +323,10 @@ ExecuteResult VirtualMachine::execute_insert(const Statement& statement)
 
 ExecuteResult VirtualMachine::execute_select(const Statement& statement)
 {
-    auto cursor = std::make_unique<Cursor>(Cursor(this->table));
+    auto cursor = std::make_unique<Cursor>(Cursor(*this->table));
     while (!cursor->is_end_of_table())
     {
-        auto *page = (LeafNode *)(cursor->table->pager->get_page(cursor->get_page_num()));
+        auto page = static_cast<LeafNode *>((cursor->table.pager->get_page(cursor->get_page_num())));
         page->get_cell(cursor->get_cell_num())->get_value()->print();
         cursor->advance();
     };

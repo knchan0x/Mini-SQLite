@@ -10,11 +10,11 @@ class Database
 public:
     // functions
 
-    Database(std::string filename);
+    Database(const std::string &filename);
     ~Database();
 
     // Currently, only one table is support which is "Default_Table"
-    Table *get_table(std::string table_name = "Default_Table");
+    Table *get_table(const std::string &table_name = "Default_Table");
 
 private:
     std::unordered_map<std::string, Table *> tables;
