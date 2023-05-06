@@ -14,7 +14,7 @@ public:
     ~Database();
 
     // Currently, only one table is support which is "Default_Table"
-    Table *get_table(std::string table_name);
+    Table *get_table(std::string table_name = "Default_Table");
 
 private:
     std::unordered_map<std::string, Table *> tables;
