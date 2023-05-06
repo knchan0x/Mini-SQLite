@@ -28,7 +28,7 @@ void Runtime::indefinite_loop()
 {
     auto input_buffer = InputBuffer();
     auto processor = CommandProcessor();
-    auto vm = VirtualMachine(this->db->get_table("Default_Table")); // Default table name as there is only one table
+    auto vm = VirtualMachine(this->db->get_table()); // get default table
 
     Statement *statement;
     bool flag = true;
