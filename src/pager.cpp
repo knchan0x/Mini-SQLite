@@ -38,14 +38,14 @@ Pager::Pager(std::string filename)
 
 Pager::~Pager()
 {
-    for (auto page : this->pages)
+    for (auto& page : this->pages)
     {
         if (page)
         {
             delete page;
         }
     }
-    for (auto data : this->page_data)
+    for (auto& data : this->page_data)
     {
         if (data)
         {
@@ -215,6 +215,11 @@ LeafNode *Pager::deserialize_leaf(char *page_data)
     return node;
 }
 
+uint32_t Pager::get_page_num()
+{
+    return this->num_pages;
+}
+
 // Until we start recycling free pages, new pages will always
 // go onto the end of the database file
 uint32_t Pager::get_unused_page_num()
@@ -222,7 +227,7 @@ uint32_t Pager::get_unused_page_num()
     return this->num_pages;
 }
 
-void Pager::clean_page(uint32_t page_num)
+void Pager::clean_page_data(uint32_t page_num)
 {
     char *old_page = this->page_data[page_num];
     char *new_page = this->new_page_data();
@@ -247,7 +252,7 @@ Node *Pager::set_node_type(uint32_t page_num, NodeType new_type)
     Node *node = this->get_page(page_num);
     if (node->get_node_type() != new_type)
     {
-        this->clean_page(page_num);
+        this->clean_page_data(page_num);
         // set node type
         char *page_data = this->page_data[page_num];
         NodeType *node_type = (NodeType *)(&page_data[NODE_TYPE_OFFSET]);

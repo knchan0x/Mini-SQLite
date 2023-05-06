@@ -11,7 +11,7 @@ int main(int argc, char *argv[])
         std::exit(EXIT_FAILURE);
     }
 
-    Database db = Database(argv[1]);
-    Runtime runtime = Runtime(&db);
+    auto db = Database(argv[1]);
+    auto runtime = Runtime(&db);
     runtime.indefinite_loop();
 }

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <tuple>
+
 #include "table.hpp"
 
 struct InputBuffer
@@ -28,42 +30,26 @@ enum class StatementType
 
 struct Statement
 {
-    ParseResult result;
     StatementType type;
     Row row_to_insert;
 
-    // parse failure
-    Statement(ParseResult result)
-        : result(result)
-    {
-    }
-
-    // meta commend
-    Statement(ParseResult result, StatementType type)
-        : result(result), type(type)
-    {
-    }
-
-    // normal statement
-    Statement(ParseResult result, StatementType type, Row row_to_insert)
-        : result(result), type(type), row_to_insert(row_to_insert)
-    {
-    }
+    Statement(StatementType type);                    // meta commend
+    Statement(StatementType type, Row row_to_insert); // normal statement
 };
 
 class CommandProcessor
 {
-private:
-    // functions
-
-    Statement *parse_meta_command(InputBuffer *input_buffer);
-    Statement *parse_statement(InputBuffer *input_buffer);
-    Statement *parse_insert(InputBuffer *input_buffer);
-    Statement *parse_select(InputBuffer *input_buffer);
-
 public:
     // functions
 
     // build and return an new statement
-    Statement *parse(InputBuffer *InputBuffer);
+    std::tuple<ParseResult, Statement *> parse(const InputBuffer &input_buffer);
+
+private:
+    // functions
+
+    std::tuple<ParseResult, Statement *> parse_meta_command(const InputBuffer &input_buffer);
+    std::tuple<ParseResult, Statement *> parse_statement(const InputBuffer &input_buffer);
+    std::tuple<ParseResult, Statement *> parse_insert(const InputBuffer &input_buffer);
+    std::tuple<ParseResult, Statement *> parse_select(const InputBuffer &input_buffer);
 };

@@ -8,7 +8,7 @@ Table::Table(std::string filename)
     this->root_page_num = 0;
     this->pager = new Pager(filename);
 
-    if (this->pager->num_pages == 0)
+    if (this->pager->get_page_num() == 0)
     {
         // New database file. Initialize page 0 as leaf node.
         Node *root_node = this->pager->get_page(0);
@@ -18,7 +18,7 @@ Table::Table(std::string filename)
 
 Table::~Table()
 {
-    for (uint32_t i = 0; i < pager->num_pages; i++)
+    for (uint32_t i = 0; i < pager->get_page_num(); i++)
     {
         if (pager->get_page(i) == nullptr)
         {

@@ -4,11 +4,6 @@
 
 class Table
 {
-private:
-    // variables
-
-    uint32_t root_page_num;
-
 public:
     // variables
     Pager *pager;
@@ -19,4 +14,9 @@ public:
 
     uint32_t get_root();
     Node *new_root(uint32_t page_num);
+
+private:
+    // variables
+
+    uint32_t root_page_num;
 };

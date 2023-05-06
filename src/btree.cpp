@@ -33,13 +33,13 @@ Row *LeafNodeCell::get_value()
     return this->value;
 }
 
-void LeafNodeCell::set_value(Row *row)
+void LeafNodeCell::set_value(const Row& row)
 {
     // copy value of *row to *this->value
     // same as
     // memcpy(this->value, row, LEAF_NODE_VALUE_SIZE);
     // copying the elements one by one may avoid copying padding
-    *this->value = *row;
+    *this->value = row;
 }
 
 LeafNodeCell *LeafNodeCell::get_address()
@@ -103,7 +103,7 @@ LeafNode::LeafNode(NodeType *nodeType, uint32_t *next_leaf_num, bool *isRoot, ui
 
 LeafNode::~LeafNode()
 {
-    for (auto cell : this->cells)
+    for (auto& cell : this->cells)
     {
         delete cell;
     }
@@ -139,7 +139,7 @@ void LeafNode::set_cell(uint32_t index, LeafNodeCell *cell)
     this->cells[index] = cell;
 }
 
-void LeafNode::set_cell(uint32_t index, uint32_t key, Row *row)
+void LeafNode::set_cell(uint32_t index, uint32_t key, const Row& row)
 {
     LeafNodeCell *cell = this->cells[index];
     cell->set_key(key);
@@ -190,7 +190,7 @@ InternalNode::InternalNode(NodeType *nodeType, bool *isRoot, uint32_t *parent_nu
 
 InternalNode::~InternalNode()
 {
-    for (auto cell : this->cells)
+    for (auto& cell : this->cells)
     {
         delete cell;
     }

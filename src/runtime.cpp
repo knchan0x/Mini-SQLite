@@ -6,21 +6,18 @@
 #include "table.hpp"
 #include "vm.hpp"
 
-Runtime::Runtime(Database *db)
-{
-    this->db = db;
-}
+Runtime::Runtime(Database *db) : db(db) {}
 
 void print_prompt()
 {
     std::cout << "db > ";
 }
 
-void read_input(InputBuffer *input_buffer)
+void read_input(InputBuffer& input_buffer)
 {
-    std::getline(std::cin, input_buffer->buffer);
+    std::getline(std::cin, input_buffer.buffer);
 
-    if (input_buffer->buffer.size() <= 0)
+    if (input_buffer.buffer.size() <= 0)
     {
         std::cout << "Error reading input" << std::endl;
         std::exit(EXIT_FAILURE);
@@ -29,22 +26,23 @@ void read_input(InputBuffer *input_buffer)
 
 void Runtime::indefinite_loop()
 {
-    InputBuffer input_buffer = InputBuffer();
-    CommandProcessor processor = CommandProcessor();
-    VirtualMachine vm = VirtualMachine(this->db->get_table("Default_Table")); // Default table name as there is only one table
+    auto input_buffer = InputBuffer();
+    auto processor = CommandProcessor();
+    auto vm = VirtualMachine(this->db->get_table("Default_Table")); // Default table name as there is only one table
 
     Statement *statement;
     bool flag = true;
     while (flag)
     {
         print_prompt();
-        read_input(&input_buffer);
-        statement = processor.parse(&input_buffer);
+        read_input(input_buffer);
+        auto [parse_result, parse_statement] = processor.parse(input_buffer);
+        statement = parse_statement;
 
-        switch (statement->result)
+        switch (parse_result)
         {
         case ParseResult::SUCCESS:
-            switch (vm.execute(statement))
+            switch (vm.execute(*statement))
             {
             case ExecuteResult::SUCCESS:
                 std::cout << "Executed." << std::endl;
