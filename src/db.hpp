@@ -10,8 +10,11 @@ class Database
 public:
     // functions
 
-    Database(const std::string &filename);
+    explicit Database(const std::string &filename);
     ~Database();
+
+    Database(const Database &) = delete;
+    Database &operator=(const Database &) = delete;
 
     // Currently, only one table is support which is "Default_Table"
     Table *get_table(const std::string &table_name = "Default_Table");

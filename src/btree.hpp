@@ -104,6 +104,9 @@ public:
     Node(NodeType *nodeType, bool *isRoot, uint32_t *parent_num);
     virtual ~Node() = default;
 
+    Node(const Node &) = delete;
+    Node &operator=(const Node &) = delete;
+
     NodeType get_node_type();
 
     bool is_root();
@@ -133,6 +136,9 @@ public:
 
     LeafNodeCell(uint32_t *key, Row *value);
 
+    LeafNodeCell(const LeafNodeCell &) = delete;
+    LeafNodeCell &operator=(const LeafNodeCell &) = delete;
+
     uint32_t get_key();
     void set_key(uint32_t key);
 
@@ -155,6 +161,9 @@ public:
 
     LeafNode(NodeType *nodeType, uint32_t *next_leaf_num, bool *isRoot, uint32_t *parent_num, uint32_t *num_cells);
     ~LeafNode();
+
+    LeafNode(const LeafNode &) = delete;
+    LeafNode &operator=(const LeafNode &) = delete;
 
     uint32_t get_max_key() override;
 
@@ -190,6 +199,9 @@ public:
 
     InternalNodeCell(uint32_t *key, uint32_t *value);
 
+    InternalNodeCell(const InternalNodeCell &) = delete;
+    InternalNodeCell &operator=(const InternalNodeCell &) = delete;
+
     uint32_t get_key();
     void set_key(uint32_t key);
 
@@ -212,6 +224,9 @@ public:
 
     InternalNode(NodeType *nodeType, bool *isRoot, uint32_t *parent_num, uint32_t *num_keys, uint32_t *right_child_num);
     ~InternalNode();
+
+    InternalNode(const InternalNode &) = delete;
+    InternalNode &operator=(const InternalNode &) = delete;
 
     uint32_t get_max_key() override;
 

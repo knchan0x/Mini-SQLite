@@ -35,7 +35,7 @@ void Cursor::advance()
     }
 }
 
-void Cursor::insert(uint32_t key, const Row& value)
+void Cursor::insert(uint32_t key, const Row &value)
 {
     auto node = static_cast<LeafNode *>(this->table.pager->get_page(this->page_num));
 
@@ -65,7 +65,7 @@ void Cursor::insert(uint32_t key, const Row& value)
 constexpr uint32_t LEAF_NODE_RIGHT_SPLIT_COUNT = (LEAF_NODE_MAX_CELLS + 1) / 2;
 constexpr uint32_t LEAF_NODE_LEFT_SPLIT_COUNT = (LEAF_NODE_MAX_CELLS + 1) - LEAF_NODE_RIGHT_SPLIT_COUNT;
 
-void Cursor::split_and_insert(uint32_t key, const Row& value)
+void Cursor::split_and_insert(uint32_t key, const Row &value)
 {
     // Create a new node and move half the cells over.
     // Insert the new value in one of the two nodes.
@@ -242,21 +242,24 @@ void Cursor::internal_node_find(uint32_t page_num, uint32_t key)
     }
 }
 
-uint32_t Cursor::get_page_num() {
+uint32_t Cursor::get_page_num()
+{
     return this->page_num;
 }
 
-uint32_t Cursor::get_cell_num() {
+uint32_t Cursor::get_cell_num()
+{
     return this->cell_num;
 }
 
-bool Cursor::is_end_of_table() {
+bool Cursor::is_end_of_table()
+{
     return this->end_of_table;
 }
 
 VirtualMachine::VirtualMachine(Table *table) : table(table) {}
 
-ExecuteResult VirtualMachine::execute(const Statement& statement)
+ExecuteResult VirtualMachine::execute(const Statement &statement)
 {
     switch (statement.type)
     {
@@ -302,7 +305,7 @@ ExecuteResult VirtualMachine::print_constants()
     return ExecuteResult::SUCCESS;
 }
 
-ExecuteResult VirtualMachine::execute_insert(const Statement& statement)
+ExecuteResult VirtualMachine::execute_insert(const Statement &statement)
 {
     auto cursor = std::make_unique<Cursor>(Cursor(*this->table));
     uint32_t key_to_insert = statement.row_to_insert.id;
@@ -323,7 +326,7 @@ ExecuteResult VirtualMachine::execute_insert(const Statement& statement)
     return ExecuteResult::SUCCESS;
 }
 
-ExecuteResult VirtualMachine::execute_select(const Statement& statement)
+ExecuteResult VirtualMachine::execute_select(const Statement &statement)
 {
     auto cursor = std::make_unique<Cursor>(Cursor(*this->table));
     while (!cursor->is_end_of_table())

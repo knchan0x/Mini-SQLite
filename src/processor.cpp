@@ -3,6 +3,8 @@
 
 #include "processor.hpp"
 
+InputBuffer::InputBuffer() {}
+
 // meta commend
 Statement::Statement(StatementType type) : type(type) {}
 

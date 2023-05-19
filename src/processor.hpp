@@ -7,6 +7,11 @@
 struct InputBuffer
 {
     std::string buffer;
+
+    InputBuffer();
+
+    InputBuffer(const InputBuffer &) = delete;
+    InputBuffer &operator=(const InputBuffer &) = delete;
 };
 
 enum class ParseResult
@@ -33,8 +38,11 @@ struct Statement
     StatementType type;
     Row row_to_insert;
 
-    Statement(StatementType type);                           // meta commend
+    explicit Statement(StatementType type);                  // meta commend
     Statement(StatementType type, const Row &row_to_insert); // normal statement
+
+    Statement(const Statement &) = delete;
+    Statement &operator=(const Statement &) = delete;
 };
 
 class CommandProcessor

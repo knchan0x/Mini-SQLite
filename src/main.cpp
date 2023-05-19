@@ -12,8 +12,8 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    auto db = Database(argv[1]);
-    auto runtime = Runtime(&db);
+    Database db(argv[1]);
+    Runtime runtime(&db);
     
     try
     {

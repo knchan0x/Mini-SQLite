@@ -9,7 +9,10 @@ class Runtime
 public:
     // functions
 
-    Runtime(Database *db);
+    explicit Runtime(Database *db);
+
+    Runtime(const Runtime &) = delete;
+    Runtime &operator=(const Runtime &) = delete;
 
     void indefinite_loop();
 
@@ -21,5 +24,5 @@ private:
     // functions
 
     void print_prompt();
-    bool read_input(InputBuffer& input_buffer);
+    bool read_input(InputBuffer &input_buffer);
 };

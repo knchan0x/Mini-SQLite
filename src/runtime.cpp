@@ -14,7 +14,7 @@ void Runtime::print_prompt()
 
 // read input and store it in input_buffer
 // return true if successful, otherwise, return false
-bool Runtime::read_input(InputBuffer& input_buffer)
+bool Runtime::read_input(InputBuffer &input_buffer)
 {
     std::getline(std::cin, input_buffer.buffer);
 
@@ -27,17 +27,18 @@ bool Runtime::read_input(InputBuffer& input_buffer)
 
 void Runtime::indefinite_loop()
 {
-    auto input_buffer = InputBuffer();
-    auto processor = CommandProcessor();
-    auto vm = VirtualMachine(this->db->get_table()); // get default table
+    InputBuffer input_buffer;
+    CommandProcessor processor;
+    VirtualMachine vm(this->db->get_table()); // get default table
 
     Statement *statement;
     bool flag = true;
     while (flag)
     {
         print_prompt();
-        
-        if (!read_input(input_buffer)) {
+
+        if (!read_input(input_buffer))
+        {
             std::cout << "Unable to read input" << std::endl;
             std::exit(EXIT_FAILURE);
         }

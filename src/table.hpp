@@ -6,11 +6,16 @@ class Table
 {
 public:
     // variables
+
     Pager *pager;
 
     // functions
-    Table(const std::string &filename);
+
+    explicit Table(const std::string &filename);
     ~Table();
+
+    Table(const Table &) = delete;
+    Table &operator=(const Table &) = delete;
 
     uint32_t get_root();
     Node &new_root(uint32_t page_num);

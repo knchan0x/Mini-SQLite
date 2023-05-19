@@ -59,7 +59,11 @@ class VirtualMachine
 public:
     // functions
 
-    VirtualMachine(Table *table);
+    explicit VirtualMachine(Table *table);
+
+    VirtualMachine(const VirtualMachine &) = delete;
+    VirtualMachine &operator=(const VirtualMachine &) = delete;
+
     ExecuteResult execute(const Statement &statement);
 
 private:

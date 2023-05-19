@@ -9,8 +9,11 @@ class Pager
 public:
     // functions
 
-    Pager(const std::string &filename);
+    explicit Pager(const std::string &filename);
     ~Pager();
+
+    Pager(const Pager &) = delete;
+    Pager &operator=(const Pager &) = delete;
 
     Node *get_page(uint32_t page_num);
 
