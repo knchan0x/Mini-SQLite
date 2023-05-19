@@ -33,13 +33,11 @@ Row *LeafNodeCell::get_value()
     return this->value;
 }
 
-void LeafNodeCell::set_value(const Row& row)
+void LeafNodeCell::set_value(const Row &row)
 {
-    // copy value of *row to *this->value
-    // same as
-    // memcpy(this->value, row, LEAF_NODE_VALUE_SIZE);
+    // = *this->value = row;
     // copying the elements one by one may avoid copying padding
-    *this->value = row;
+    memcpy(this->value, &row, LEAF_NODE_VALUE_SIZE);
 }
 
 LeafNodeCell *LeafNodeCell::get_address()
@@ -57,33 +55,24 @@ NodeType Node::get_node_type()
     return *this->nodeType;
 }
 
-bool Node::get_node_root()
+bool Node::is_root()
 {
     return *this->isRoot;
 }
 
-void Node::set_node_root(bool isRoot)
+void Node::set_root(bool isRoot)
 {
     *this->isRoot = isRoot;
 }
 
-uint32_t Node::get_max_key()
+uint32_t LeafNode::get_max_key()
 {
-    uint32_t max;
-    switch (this->get_node_type())
-    {
-    case NodeType::INTERNAL:
-    {
-        InternalNode *casted_internal = (InternalNode *)this;
-        max = casted_internal->get_key_at_cell(casted_internal->get_num_keys() - 1);
-    }
-    case NodeType::LEAF:
-    {
-        LeafNode *casted_leaf = (LeafNode *)this;
-        max = casted_leaf->get_cell(casted_leaf->get_num_cells() - 1)->get_key();
-    }
-    }
-    return max;
+    return this->get_cell(this->get_num_cells() - 1)->get_key();
+}
+
+uint32_t InternalNode::get_max_key()
+{
+    return this->get_key_at_cell(this->get_num_keys() - 1);
 }
 
 uint32_t Node::get_parent()
@@ -103,7 +92,7 @@ LeafNode::LeafNode(NodeType *nodeType, uint32_t *next_leaf_num, bool *isRoot, ui
 
 LeafNode::~LeafNode()
 {
-    for (auto& cell : this->cells)
+    for (auto &cell : this->cells)
     {
         delete cell;
     }
@@ -139,7 +128,7 @@ void LeafNode::set_cell(uint32_t index, LeafNodeCell *cell)
     this->cells[index] = cell;
 }
 
-void LeafNode::set_cell(uint32_t index, uint32_t key, const Row& row)
+void LeafNode::set_cell(uint32_t index, uint32_t key, const Row &row)
 {
     LeafNodeCell *cell = this->cells[index];
     cell->set_key(key);
@@ -190,7 +179,7 @@ InternalNode::InternalNode(NodeType *nodeType, bool *isRoot, uint32_t *parent_nu
 
 InternalNode::~InternalNode()
 {
-    for (auto& cell : this->cells)
+    for (auto &cell : this->cells)
     {
         delete cell;
     }
@@ -216,8 +205,7 @@ uint32_t InternalNode::get_child_at_cell(uint32_t cell_num)
     uint32_t num_keys = this->get_num_keys();
     if (cell_num > num_keys)
     {
-        std::cout << "Tried to access child_num " << cell_num << " > num_keys " << num_keys << std::endl;
-        std::exit(EXIT_FAILURE);
+        throw std::out_of_range("cell num > num keys");
     }
     else if (cell_num == num_keys)
     {
@@ -277,7 +265,10 @@ uint32_t InternalNode::find_child(uint32_t key)
 {
     uint32_t num_keys = this->get_num_keys();
 
+    //
     // Binary search
+    //
+    
     uint32_t min_index = 0;
     uint32_t max_index = num_keys; // there is one more child than key
 
