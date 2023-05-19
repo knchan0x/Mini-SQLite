@@ -1,27 +1,28 @@
 #include <iostream>
 
 #include "db.hpp"
-#include "processor.hpp"
 #include "runtime.hpp"
 #include "table.hpp"
 #include "vm.hpp"
 
 Runtime::Runtime(Database *db) : db(db) {}
 
-void print_prompt()
+void Runtime::print_prompt()
 {
     std::cout << "db > ";
 }
 
-void read_input(InputBuffer& input_buffer)
+// read input and store it in input_buffer
+// return true if successful, otherwise, return false
+bool Runtime::read_input(InputBuffer& input_buffer)
 {
     std::getline(std::cin, input_buffer.buffer);
 
     if (input_buffer.buffer.size() <= 0)
     {
-        std::cout << "Error reading input" << std::endl;
-        std::exit(EXIT_FAILURE);
+        return false;
     }
+    return true;
 }
 
 void Runtime::indefinite_loop()
@@ -35,7 +36,12 @@ void Runtime::indefinite_loop()
     while (flag)
     {
         print_prompt();
-        read_input(input_buffer);
+        
+        if (!read_input(input_buffer)) {
+            std::cout << "Unable to read input" << std::endl;
+            std::exit(EXIT_FAILURE);
+        }
+
         auto [parse_result, parse_statement] = processor.parse(input_buffer);
         statement = parse_statement;
 

@@ -7,9 +7,9 @@
 Statement::Statement(StatementType type) : type(type) {}
 
 // normal statement
-Statement::Statement(StatementType type, Row row_to_insert) : type(type), row_to_insert(row_to_insert) {}
+Statement::Statement(StatementType type, const Row &row_to_insert) : type(type), row_to_insert(row_to_insert) {}
 
-std::tuple<ParseResult, Statement *> CommandProcessor::parse_meta_command(const InputBuffer& input_buffer)
+std::tuple<ParseResult, Statement *> CommandProcessor::parse_meta_command(const InputBuffer &input_buffer)
 {
     if (input_buffer.buffer.find(".exit") == 0)
     {
@@ -33,7 +33,7 @@ const uint32_t INSERT_POSITION_ID = 1;
 const uint32_t INSERT_POSITION_USERNAME = 2;
 const uint32_t INSERT_POSITION_EMAIL = 3;
 
-std::tuple<ParseResult, Statement *> CommandProcessor::parse_insert(const InputBuffer& input_buffer)
+std::tuple<ParseResult, Statement *> CommandProcessor::parse_insert(const InputBuffer &input_buffer)
 {
     std::vector<std::string> tokens;
     std::stringstream inputs(input_buffer.buffer);
@@ -43,12 +43,12 @@ std::tuple<ParseResult, Statement *> CommandProcessor::parse_insert(const InputB
         tokens.push_back(token);
     }
 
-    if (tokens.size() > 4)
+    if (tokens.size() != 4)
     {
         return std::make_tuple(ParseResult::SYNTAX_ERROR, nullptr);
     }
 
-    uint32_t id = atoi(tokens[INSERT_POSITION_ID].c_str());
+    uint32_t id = std::stoi(tokens[INSERT_POSITION_ID].c_str());
     if (id < 0)
     {
         return std::make_tuple(ParseResult::NEGATIVE_ID, nullptr);
@@ -67,12 +67,12 @@ std::tuple<ParseResult, Statement *> CommandProcessor::parse_insert(const InputB
     return std::make_tuple(ParseResult::SUCCESS, statement);
 }
 
-std::tuple<ParseResult, Statement *> CommandProcessor::parse_select(const InputBuffer& input_buffer)
+std::tuple<ParseResult, Statement *> CommandProcessor::parse_select(const InputBuffer &input_buffer)
 {
     return std::make_tuple(ParseResult::SUCCESS, new Statement(StatementType::SELECT));
 }
 
-std::tuple<ParseResult, Statement *> CommandProcessor::parse_statement(const InputBuffer& input_buffer)
+std::tuple<ParseResult, Statement *> CommandProcessor::parse_statement(const InputBuffer &input_buffer)
 {
     if (input_buffer.buffer.find("insert") == 0)
     {
@@ -85,7 +85,7 @@ std::tuple<ParseResult, Statement *> CommandProcessor::parse_statement(const Inp
     return std::make_tuple(ParseResult::UNRECOGNIZED_STATEMENT, nullptr);
 }
 
-std::tuple<ParseResult, Statement *> CommandProcessor::parse(const InputBuffer& input_buffer)
+std::tuple<ParseResult, Statement *> CommandProcessor::parse(const InputBuffer &input_buffer)
 {
     if (input_buffer.buffer.find(".") == 0)
     {

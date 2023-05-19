@@ -33,8 +33,8 @@ struct Statement
     StatementType type;
     Row row_to_insert;
 
-    Statement(StatementType type);                    // meta commend
-    Statement(StatementType type, Row row_to_insert); // normal statement
+    Statement(StatementType type);                           // meta commend
+    Statement(StatementType type, const Row &row_to_insert); // normal statement
 };
 
 class CommandProcessor

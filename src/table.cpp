@@ -7,12 +7,12 @@ Table::Table(const std::string &filename)
 {
     this->root_page_num = 0;
     this->pager = new Pager(filename);
-
+    
     if (this->pager->get_page_num() == 0)
     {
         // New database file. Initialize page 0 as leaf node.
         Node *root_node = this->pager->get_page(0);
-        root_node->set_node_root(true);
+        root_node->set_root(true);
     }
 }
 
@@ -24,7 +24,14 @@ Table::~Table()
         {
             continue;
         }
-        pager->flush(i);
+        try
+        {
+            pager->flush(i);
+        }
+        catch(const std::runtime_error &e)
+        {
+            std::cerr << e.what() << std::endl;
+        }
     }
     delete pager;
 }
@@ -48,11 +55,11 @@ Node &Table::new_root(uint32_t page_num)
 
     // Left child has data copied from old root
     this->pager->copy_node_data(left_child_page_num, root_page_num);
-    left_child->set_node_root(false);
+    left_child->set_root(false);
 
     // Root node is a new internal node with one key and two children
     auto new_root = static_cast<InternalNode *>(this->pager->set_node_type(root_page_num, NodeType::INTERNAL));
-    new_root->set_node_root(true);
+    new_root->set_root(true);
     new_root->set_num_keys(1);
     new_root->set_right_child(page_num);
     new_root->set_cell(0, left_child->get_max_key(), left_child_page_num);

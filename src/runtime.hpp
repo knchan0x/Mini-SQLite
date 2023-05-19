@@ -1,6 +1,7 @@
 #pragma once
 
 #include "db.hpp"
+#include "processor.hpp"
 
 // a REPL environment
 class Runtime
@@ -16,4 +17,9 @@ private:
     // variables
 
     Database *db;
+
+    // functions
+
+    void print_prompt();
+    bool read_input(InputBuffer& input_buffer);
 };

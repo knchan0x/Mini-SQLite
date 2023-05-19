@@ -116,7 +116,7 @@ void Cursor::split_and_insert(uint32_t key, const Row& value)
     old_node->set_next_leaf_num(new_page_num);
 
     // Update root node
-    if (old_node->get_node_root())
+    if (old_node->is_root())
     {
         this->table.new_root(new_page_num);
     }
@@ -207,6 +207,7 @@ void Cursor::leaf_node_find(uint32_t page_num, uint32_t key)
         {
             this->page_num = page_num;
             this->cell_num = index;
+            return;
         }
         if (key < key_at_index)
         {
@@ -234,8 +235,10 @@ void Cursor::internal_node_find(uint32_t page_num, uint32_t key)
     {
     case NodeType::LEAF:
         this->leaf_node_find(child_num, key);
+        break;
     case NodeType::INTERNAL:
         this->internal_node_find(child_num, key);
+        break;
     }
 }
 
@@ -306,8 +309,7 @@ ExecuteResult VirtualMachine::execute_insert(const Statement& statement)
     cursor->find(key_to_insert);
 
     auto page = static_cast<LeafNode *>(cursor->table.pager->get_page(cursor->get_page_num()));
-    uint32_t num_cells = page->get_num_cells();
-    if (cursor->get_cell_num() < num_cells)
+    if (cursor->get_cell_num() < page->get_num_cells())
     {
         uint32_t key_at_index = page->get_cell(cursor->get_cell_num())->get_key();
         if (key_at_index == key_to_insert)
