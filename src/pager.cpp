@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <stdexcept>
 
 #include "pager.hpp"
 
@@ -15,8 +16,7 @@ Pager::Pager(const std::string &filename)
         file = std::ifstream(filename, std::ios::ate | std::ios::binary);
         if (!file.is_open())
         {
-            std::cout << "Unable to create file: " << filename << std::endl;
-            std::exit(EXIT_FAILURE);
+            throw std::runtime_error("Unable to create file: " + filename);
         }
     }
 
@@ -26,8 +26,7 @@ Pager::Pager(const std::string &filename)
     this->num_pages = file_length / PAGE_SIZE;
     if (file_length % PAGE_SIZE != 0)
     {
-        std::cout << "File Corrupted. Db file contains partial page." << std::endl;
-        std::exit(EXIT_FAILURE);
+        throw std::runtime_error("File Corrupted. Db file contains partial page.");
     }
 
     for (uint32_t i = 0; i < TABLE_MAX_PAGES; i++)
@@ -38,14 +37,14 @@ Pager::Pager(const std::string &filename)
 
 Pager::~Pager()
 {
-    for (auto& page : this->pages)
+    for (auto &page : this->pages)
     {
         if (page)
         {
             delete page;
         }
     }
-    for (auto& data : this->page_data)
+    for (auto &data : this->page_data)
     {
         if (data)
         {
@@ -58,8 +57,7 @@ void Pager::flush(uint32_t page_num)
 {
     if (this->pages[page_num] == nullptr)
     {
-        std::cout << "Tried to flush null page." << std::endl;
-        std::exit(EXIT_FAILURE);
+        throw std::runtime_error("Tried to flush null page.");
     }
 
     std::ofstream file;
@@ -74,8 +72,7 @@ void Pager::flush(uint32_t page_num)
 
     if (!file.is_open())
     {
-        std::cout << "Fail to open file: " << this->filename << std::endl;
-        std::exit(EXIT_FAILURE);
+        throw std::runtime_error("Fail to open file: " + this->filename);
     };
 
     file.seekp(page_num * PAGE_SIZE, std::ios::beg);
@@ -83,13 +80,11 @@ void Pager::flush(uint32_t page_num)
 
     if (file.bad())
     {
-        std::cout << "Read/writing error on i/o operation occur in writing file: " << this->filename << std::endl;
-        std::exit(EXIT_FAILURE);
+        throw std::runtime_error("Read/writing error on i/o operation occur in writing file: " + this->filename);
     }
     if (file.fail())
     {
-        std::cout << "Logical error on i/o operation occur in writing file: " << this->filename << std::endl;
-        std::exit(EXIT_FAILURE);
+        throw std::runtime_error("cal error on i/o operation occur in writing file: " + this->filename);
     }
 
     file.close();
@@ -99,10 +94,7 @@ Node *Pager::get_page(uint32_t page_num)
 {
     if (page_num > TABLE_MAX_PAGES)
     {
-        std::cout << "Tried to fetch page number out of bounds."
-                  << page_num << " > " << TABLE_MAX_PAGES
-                  << std::endl;
-        std::exit(EXIT_FAILURE);
+        throw std::out_of_range("Tried to fetch page number out of bounds.");
     }
 
     if (this->pages[page_num] == nullptr)
@@ -116,16 +108,14 @@ Node *Pager::get_page(uint32_t page_num)
             std::ifstream file = std::ifstream(filename, std::ios::ate | std::ios::binary);
             if (!file.is_open())
             {
-                std::cout << "Fail to open file: " << this->filename << std::endl;
-                std::exit(EXIT_FAILURE);
+                throw std::runtime_error("Fail to open file: " + this->filename);
             };
             file.seekg(page_num * PAGE_SIZE, std::ios::beg);
             file.read(data, PAGE_SIZE);
             if (!file.eof() && file.fail())
             {
-                std::cout << "Error reading file: " << this->filename << std::endl;
                 file.close();
-                std::exit(EXIT_FAILURE);
+                throw std::runtime_error("Error reading file: " + this->filename);
             }
             file.close();
         }
