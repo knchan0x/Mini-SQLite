@@ -31,7 +31,6 @@ void Runtime::indefinite_loop()
     CommandProcessor processor;
     VirtualMachine vm(this->db->get_table()); // get default table
 
-    Statement *statement;
     bool flag = true;
     while (flag)
     {
@@ -44,12 +43,11 @@ void Runtime::indefinite_loop()
         }
 
         auto [parse_result, parse_statement] = processor.parse(input_buffer);
-        statement = parse_statement;
 
         switch (parse_result)
         {
         case ParseResult::SUCCESS:
-            switch (vm.execute(*statement))
+            switch (vm.execute(*parse_statement))
             {
             case ExecuteResult::SUCCESS:
                 std::cout << "Executed." << std::endl;
@@ -78,7 +76,7 @@ void Runtime::indefinite_loop()
             std::cout << "Unrecognized keyword at start of " << input_buffer.buffer << std::endl;
             break;
         }
-    }
 
-    delete statement;
+        delete parse_statement;
+    }
 }
